@@ -14,7 +14,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6C63FF),
+          seedColor: const Color(0xFF37474F),
           brightness: Brightness.light,
         ),
         useMaterial3: true,
@@ -223,11 +223,11 @@ class _DashboardView extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: const Color(0xFF6C63FF).withOpacity(0.15),
+                backgroundColor: const Color(0xFF37474F).withOpacity(0.15),
                 child: const Text(
                   'AV',
                   style: TextStyle(
-                    color: Color(0xFF6C63FF),
+                    color: Color(0xFF37474F),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -257,15 +257,11 @@ class _DashboardView extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6C63FF), Color(0xFF9C27B0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFF37474F),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6C63FF).withOpacity(0.35),
+            color: const Color(0xFF37474F).withOpacity(0.35),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -320,25 +316,25 @@ class _DashboardView extends StatelessWidget {
           _QuickActionButton(
             icon: Icons.add,
             label: 'Añadir',
-            color: const Color(0xFF6C63FF),
+            color: const Color(0xFF37474F),
             onTap: () => _showAddDialog(context),
           ),
           _QuickActionButton(
             icon: Icons.send,
             label: 'Enviar',
-            color: const Color(0xFF00BCD4),
+            color: const Color(0xFF546E7A),
             onTap: () {},
           ),
           _QuickActionButton(
             icon: Icons.account_balance,
             label: 'Banco',
-            color: const Color(0xFF43A047),
+            color: const Color(0xFF78909C),
             onTap: () {},
           ),
           _QuickActionButton(
             icon: Icons.more_horiz,
             label: 'Más',
-            color: const Color(0xFFFF7043),
+            color: const Color(0xFF90A4AE),
             onTap: () {},
           ),
         ],
@@ -364,7 +360,7 @@ class _DashboardView extends StatelessWidget {
             onPressed: () {},
             child: const Text(
               'Ver todo',
-              style: TextStyle(color: Color(0xFF6C63FF)),
+              style: TextStyle(color: Color(0xFF37474F)),
             ),
           ),
         ],
@@ -634,7 +630,7 @@ class _AddTransactionSheetState extends State<_AddTransactionSheet> {
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
+                backgroundColor: const Color(0xFF37474F),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -742,12 +738,12 @@ class _StatsView extends StatelessWidget {
             margin: const EdgeInsets.only(right: 8),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFF6C63FF) : Colors.white,
+              color: selected ? const Color(0xFF37474F) : Colors.white,
               borderRadius: BorderRadius.circular(20),
               boxShadow: selected
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF6C63FF).withOpacity(0.3),
+                        color: const Color(0xFF37474F).withOpacity(0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 4),
                       )
@@ -873,8 +869,8 @@ class _StatsView extends StatelessWidget {
                     height: 120 * (data[i] / max),
                     decoration: BoxDecoration(
                       color: isLast
-                          ? const Color(0xFF6C63FF)
-                          : const Color(0xFF6C63FF).withOpacity(0.2),
+                          ? const Color(0xFF37474F)
+                          : const Color(0xFF37474F).withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
@@ -884,7 +880,7 @@ class _StatsView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       color:
-                          isLast ? const Color(0xFF6C63FF) : Colors.grey[400],
+                          isLast ? const Color(0xFF37474F) : Colors.grey[400],
                       fontWeight: isLast ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
@@ -935,20 +931,20 @@ class _ProfileView extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 48,
-              backgroundColor: const Color(0xFF6C63FF).withOpacity(0.15),
+              backgroundColor: const Color(0xFF37474F).withOpacity(0.15),
               child: const Text(
                 'AV',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF6C63FF),
+                  color: Color(0xFF37474F),
                 ),
               ),
             ),
             Container(
               padding: const EdgeInsets.all(6),
               decoration: const BoxDecoration(
-                color: Color(0xFF6C63FF),
+                color: Color(0xFF37474F),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.edit, color: Colors.white, size: 14),
@@ -977,11 +973,7 @@ class _ProfileView extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF6C63FF), Color(0xFF9C27B0)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFF37474F),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -1000,13 +992,13 @@ class _ProfileView extends StatelessWidget {
   Widget _buildMenu(BuildContext context) {
     final items = [
       _MenuItem(Icons.notifications_outlined, 'Notificaciones',
-          const Color(0xFF6C63FF)),
-      _MenuItem(Icons.security_outlined, 'Seguridad', const Color(0xFF00BCD4)),
+          const Color(0xFF37474F)),
+      _MenuItem(Icons.security_outlined, 'Seguridad', const Color(0xFF546E7A)),
       _MenuItem(
-          Icons.credit_card_outlined, 'Mis tarjetas', const Color(0xFF43A047)),
-      _MenuItem(Icons.language_outlined, 'Idioma', const Color(0xFFFF7043)),
-      _MenuItem(Icons.help_outline, 'Ayuda', const Color(0xFF9C27B0)),
-      _MenuItem(Icons.logout, 'Cerrar sesión', const Color(0xFFE53935)),
+          Icons.credit_card_outlined, 'Mis tarjetas', const Color(0xFF78909C)),
+      _MenuItem(Icons.language_outlined, 'Idioma', const Color(0xFF90A4AE)),
+      _MenuItem(Icons.help_outline, 'Ayuda', const Color(0xFFB0BEC5)),
+      _MenuItem(Icons.logout, 'Cerrar sesión', const Color(0xFFCFD8DC)),
     ];
 
     return Container(
@@ -1048,7 +1040,7 @@ class _ProfileView extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w500,
                 color: i == items.length - 1
-                    ? const Color(0xFFE53935)
+                    ? const Color(0xFF37474F)
                     : const Color(0xFF1A1A2E),
               ),
             ),
