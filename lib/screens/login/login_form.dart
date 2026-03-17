@@ -27,14 +27,18 @@ class _LoginFormState extends State<LoginForm> {
       mainAxisSize: MainAxisSize.min,
       children: [
 
-        const FlutterLogo(size: 60),
+        /// LOGO
+        Image.asset(
+          "assets/images/logo.png",
+          width: 70,
+        ),
 
         const SizedBox(height: 20),
 
         const Text(
-          "Iniciar sesión",
+          "Iniciar Sesión",
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 26,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -45,10 +49,20 @@ class _LoginFormState extends State<LoginForm> {
         TextField(
           controller: emailController,
           decoration: InputDecoration(
-            labelText: "Correo electrónico",
-            prefixIcon: const Icon(Icons.email_outlined),
+
+            hintText: "Correo electrónico",
+
+            prefixIcon: const Icon(
+              Icons.email_outlined,
+              color: Colors.black54,
+            ),
+
+            filled: true,
+            fillColor: const Color(0xFFF2F2F2),
+
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none,
             ),
           ),
         ),
@@ -59,26 +73,41 @@ class _LoginFormState extends State<LoginForm> {
         TextField(
           controller: passwordController,
           obscureText: true,
+
           decoration: InputDecoration(
-            labelText: "Contraseña",
-            prefixIcon: const Icon(Icons.lock_outline),
+
+            hintText: "Contraseña",
+
+            prefixIcon: const Icon(
+              Icons.lock_outline,
+              color: Colors.black54,
+            ),
+
+            filled: true,
+            fillColor: const Color(0xFFF2F2F2),
+
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none,
             ),
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 25),
 
         /// BOTON LOGIN
         SizedBox(
           width: double.infinity,
           height: 50,
+
           child: ElevatedButton(
+
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6A11CB),
+              backgroundColor: const Color(0xFFFFB84E),
+              elevation: 0,
+
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(30),
               ),
             ),
 
@@ -88,6 +117,8 @@ class _LoginFormState extends State<LoginForm> {
                 emailController.text.trim(),
                 passwordController.text.trim(),
               );
+
+              if (!mounted) return;
 
               if (user != null) {
 
@@ -109,7 +140,13 @@ class _LoginFormState extends State<LoginForm> {
 
             },
 
-            child: const Text("Ingresar"),
+            child: const Text(
+              "Ingresar",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
           ),
         ),
 
@@ -119,21 +156,31 @@ class _LoginFormState extends State<LoginForm> {
 
         const SizedBox(height: 20),
 
-        /// BOTON GOOGLE
+        /// GOOGLE LOGIN
         SizedBox(
           width: double.infinity,
           height: 50,
 
           child: OutlinedButton.icon(
+
             icon: Image.network(
               "https://cdn-icons-png.flaticon.com/512/2991/2991148.png",
               width: 20,
             ),
+
             label: const Text("Continuar con Google"),
+
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
 
             onPressed: () async {
 
               final user = await _auth.loginWithGoogle();
+
+              if (!mounted) return;
 
               if (user != null) {
 
@@ -146,7 +193,6 @@ class _LoginFormState extends State<LoginForm> {
               }
 
             },
-
           ),
         ),
 
