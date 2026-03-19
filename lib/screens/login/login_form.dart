@@ -96,7 +96,8 @@ class _LoginFormState extends State<LoginForm> {
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text("Revisa tu correo para recuperar la contraseña"),
+                    content:
+                        Text("Revisa tu correo para recuperar la contraseña"),
                   ),
                 );
               } on FirebaseAuthException catch (e) {
@@ -140,7 +141,8 @@ class _LoginFormState extends State<LoginForm> {
                     if (emailController.text.trim().isEmpty ||
                         passwordController.text.trim().isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Completa todos los campos")),
+                        const SnackBar(
+                            content: Text("Completa todos los campos")),
                       );
                       return;
                     }
@@ -164,7 +166,8 @@ class _LoginFormState extends State<LoginForm> {
                         );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("No se pudo iniciar sesión")),
+                          const SnackBar(
+                              content: Text("No se pudo iniciar sesión")),
                         );
                       }
                     } on FirebaseAuthException catch (e) {
