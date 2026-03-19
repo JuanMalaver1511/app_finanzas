@@ -1,70 +1,106 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
-
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Registro con correo
+  /// ==============================
+  /// REGISTRO CON EMAIL
+  /// ==============================
   Future<User?> registerWithEmail(String email, String password) async {
     try {
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
+      final result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
+
       return result.user;
+    } on FirebaseAuthException catch (e) {
+      throw e;
     } catch (e) {
-      print(e);
-      return null;
+      throw Exception("Error inesperado en registro");
     }
   }
 
-  // Login con correo
+  /// ==============================
+  /// LOGIN CON EMAIL
+  /// ==============================
   Future<User?> loginWithEmail(String email, String password) async {
     try {
-      UserCredential result = await _auth.signInWithEmailAndPassword(
+      final result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
       return result.user;
+    } on FirebaseAuthException catch (e) {
+      throw e;
     } catch (e) {
-      print(e);
-      return null;
+      throw Exception("Error inesperado en login");
     }
   }
 
-  // Login con Google
+  /// ==============================
+  /// LOGIN CON GOOGLE (WEB + MOVIL)
+  /// ==============================
   Future<User?> loginWithGoogle() async {
     try {
+      if (kIsWeb) {
+        /// 🔥 WEB
+        final googleProvider = GoogleAuthProvider();
 
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+        final userCredential = await _auth.signInWithPopup(googleProvider);
 
-      final GoogleSignInAuthentication? googleAuth =
-          await googleUser?.authentication;
+        return userCredential.user;
+      } else {
+        /// 📱 MÓVIL
+        final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth?.accessToken,
-        idToken: googleAuth?.idToken,
-      );
+        if (googleUser == null) return null;
 
-      UserCredential result =
-          await _auth.signInWithCredential(credential);
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
 
-      return result.user;
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
 
+        final userCredential = await _auth.signInWithCredential(credential);
+
+        return userCredential.user;
+      }
     } catch (e) {
-      print(e);
-      return null;
+      print("🔥 ERROR GOOGLE: $e");
+      throw e;
     }
   }
 
-  // Logout
+  /// ==============================
+  /// LOGOUT
+  /// ==============================
   Future<void> logout() async {
     await _auth.signOut();
+
+    if (!kIsWeb) {
+      await GoogleSignIn().signOut();
+    }
   }
 
-  // Recuperar contraseña
+  /// ==============================
+  /// RECUPERAR CONTRASEÑA
+  /// ==============================
+  /// ==============================
+  /// RECUPERAR CONTRASEÑA
+  /// ==============================
   Future<void> resetPassword(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      throw e;
+    } catch (e) {
+      throw Exception("Error al enviar correo de recuperación");
+    }
   }
 }

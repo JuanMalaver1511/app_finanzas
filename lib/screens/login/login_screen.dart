@@ -44,53 +44,49 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// LAYOUT WEB
+  /// WEB LAYOUT
   Widget _webLayout() {
     return Row(
       children: [
-        /// Panel izquierdo con imagen
+
+        /// PANEL IZQUIERDO
         Expanded(
           child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF6A11CB),
-                  Color(0xFF2575FC),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
+            color: const Color(0xFFF5F5F5),
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(40),
+                padding: const EdgeInsets.all(60),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(
-                      Icons.account_balance_wallet,
-                      color: Colors.white,
-                      size: 80,
+                  children: [
+
+                    /// LOGO
+                    Image.asset(
+                      "assets/images/logo.png",
+                      width: 120,
                     ),
-                    SizedBox(height: 20),
-                    Text(
+
+                    const SizedBox(height: 30),
+
+                    const Text(
                       "Control Financiero",
                       style: TextStyle(
                         fontSize: 36,
-                        color: Colors.white,
                         fontWeight: FontWeight.bold,
+                        color: Colors.black,
                       ),
                     ),
-                    SizedBox(height: 10),
-                    Text(
-                      "Organiza tus ingresos y gastos\n"
-                      "de manera inteligente.",
+
+                    const SizedBox(height: 10),
+
+                    const Text(
+                      "Organiza tus ingresos y gastos\nde manera inteligente.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Colors.white70,
                         fontSize: 16,
+                        color: Colors.black54,
                       ),
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -98,29 +94,34 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
 
-        /// Panel derecho login
+        /// PANEL DERECHO LOGIN
         Expanded(
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              transitionBuilder: (child, animation) {
-                final offset = Tween(
-                  begin: const Offset(1, 0),
-                  end: Offset.zero,
-                ).animate(animation);
+          child: Container(
+            color: Colors.white,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (child, animation) {
 
-                return SlideTransition(
-                  position: offset,
-                  child: child,
-                );
-              },
-              child: SingleChildScrollView(
-                child: Container(
-                key: ValueKey(currentView),
-                width: 420,
-                padding: const EdgeInsets.all(40),
-                child: currentForm(),
-              )),
+                  final offset = Tween(
+                    begin: const Offset(0.2, 0),
+                    end: Offset.zero,
+                  ).animate(animation);
+
+                  return SlideTransition(
+                    position: offset,
+                    child: child,
+                  );
+                },
+                child: SingleChildScrollView(
+                  child: Container(
+                    key: ValueKey(currentView),
+                    width: 420,
+                    padding: const EdgeInsets.all(40),
+                    child: currentForm(),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -128,19 +129,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// LAYOUT MOVIL
+  /// MOBILE LAYOUT
   Widget _mobileLayout() {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFF6A11CB),
-            Color(0xFF2575FC),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
+      color: const Color(0xFFF5F5F5),
       child: Center(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 400),
@@ -148,10 +140,20 @@ class _LoginScreenState extends State<LoginScreen> {
             key: ValueKey(currentView),
             width: 350,
             padding: const EdgeInsets.all(30),
+
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
+
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                )
+              ],
             ),
+
             child: currentForm(),
           ),
         ),

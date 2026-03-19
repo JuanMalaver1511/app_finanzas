@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
+import '../dashboard/dashboard_screen.dart';
 
 class RegisterForm extends StatefulWidget {
-
   final VoidCallback onLogin;
 
   const RegisterForm({
@@ -15,142 +16,250 @@ class RegisterForm extends StatefulWidget {
 }
 
 class _RegisterFormState extends State<RegisterForm> {
-
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
   final AuthService _auth = AuthService();
 
+  bool isLoading = false;
+
   @override
   Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        /// LOGO
+        Image.asset(
+          "assets/images/logo.png",
+          width: 70,
+        ),
 
-    return SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+        const SizedBox(height: 20),
 
-          const FlutterLogo(size: 60),
+        const Text(
+          "Crear cuenta",
+          style: TextStyle(
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
 
-          const SizedBox(height: 20),
+        const SizedBox(height: 30),
 
-          const Text(
-            "Crear cuenta",
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+        /// NOMBRE
+        TextField(
+          controller: nameController,
+          decoration: InputDecoration(
+            hintText: "Nombre",
+            prefixIcon: const Icon(Icons.person_outline),
+            filled: true,
+            fillColor: const Color(0xFFF2F2F2),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none,
             ),
           ),
+        ),
 
-          const SizedBox(height: 30),
+        const SizedBox(height: 16),
 
-          /// NOMBRE
-          TextField(
-            controller: nameController,
-            decoration: InputDecoration(
-              labelText: "Nombre",
-              prefixIcon: const Icon(Icons.person_outline),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+        /// EMAIL
+        TextField(
+          controller: emailController,
+          decoration: InputDecoration(
+            hintText: "Correo electrónico",
+            prefixIcon: const Icon(Icons.email_outlined),
+            filled: true,
+            fillColor: const Color(0xFFF2F2F2),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none,
             ),
           ),
+        ),
 
-          const SizedBox(height: 16),
+        const SizedBox(height: 16),
 
-          /// EMAIL
-          TextField(
-            controller: emailController,
-            decoration: InputDecoration(
-              labelText: "Correo electrónico",
-              prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+        /// PASSWORD
+        TextField(
+          controller: passwordController,
+          obscureText: true,
+          decoration: InputDecoration(
+            hintText: "Contraseña",
+            prefixIcon: const Icon(Icons.lock_outline),
+            filled: true,
+            fillColor: const Color(0xFFF2F2F2),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none,
             ),
           ),
+        ),
 
-          const SizedBox(height: 16),
+        const SizedBox(height: 25),
 
-          /// PASSWORD
-          TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: "Contraseña",
-              prefixIcon: const Icon(Icons.lock_outline),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+        /// BOTON REGISTRO
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFB84E),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
               ),
             ),
-          ),
+            onPressed: isLoading
+                ? null
+                : () async {
+                    if (nameController.text.isEmpty ||
+                        emailController.text.isEmpty ||
+                        passwordController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Completa todos los campos"),
+                        ),
+                      );
+                      return;
+                    }
 
-          const SizedBox(height: 25),
+                    setState(() => isLoading = true);
 
-          /// BOTON REGISTRO
-          SizedBox(
-            width: double.infinity,
-            height: 50,
+                    try {
+                      final user = await _auth.registerWithEmail(
+                        emailController.text.trim(),
+                        passwordController.text.trim(),
+                      );
 
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2575FC),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+                      if (!mounted) return;
 
-              onPressed: () async {
+                      if (user != null) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DashboardScreen(),
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("No se pudo registrar"),
+                          ),
+                        );
+                      }
+                    } on FirebaseAuthException catch (e) {
+                      String mensaje = "Error al registrar";
 
-                final user = await _auth.registerWithEmail(
-                  emailController.text.trim(),
-                  passwordController.text.trim(),
-                );
+                      if (e.code == 'email-already-in-use') {
+                        mensaje = "Este correo ya está registrado";
+                      } else if (e.code == 'weak-password') {
+                        mensaje =
+                            "La contraseña debe tener al menos 6 caracteres";
+                      } else if (e.code == 'invalid-email') {
+                        mensaje = "Correo inválido";
+                      }
 
-                if (user != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(mensaje)),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Error inesperado: $e")),
+                      );
+                    }
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Usuario creado correctamente"),
+                    if (mounted) setState(() => isLoading = false);
+                  },
+            child: isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
                     ),
-                  );
-
-                  widget.onLogin();
-
-                } else {
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Error al registrar usuario"),
+                  )
+                : const Text(
+                    "Registrarse",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
-                  );
-
-                }
-
-              },
-
-              child: const Text("Registrarse"),
-            ),
+                  ),
           ),
+        ),
 
-          const SizedBox(height: 20),
+        const SizedBox(height: 20),
+        const Divider(),
+        const SizedBox(height: 20),
 
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+        /// GOOGLE REGISTER
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton.icon(
+            icon: Image.asset("assets/images/google.png", width: 22),
+            label: Text(
+              isLoading ? "Cargando..." : "Registrarse con Google",
+              style: const TextStyle(color: Colors.black87),
+            ),
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            onPressed: isLoading
+                ? null
+                : () async {
+                    setState(() => isLoading = true);
 
-              const Text("¿Ya tienes cuenta?"),
+                    try {
+                      final user = await _auth.loginWithGoogle();
 
-              TextButton(
-                onPressed: widget.onLogin,
-                child: const Text("Iniciar sesión"),
-              )
+                      if (!mounted) return;
 
-            ],
-          )
+                      if (user != null) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const DashboardScreen(),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      /// 👉 usuario cerró popup (NO error)
+                      if (e is FirebaseAuthException &&
+                          e.code == 'popup-closed-by-user') {
+                        if (mounted) setState(() => isLoading = false);
+                        return;
+                      }
 
-        ],
-      ),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Error con Google")),
+                      );
+                    }
+
+                    if (mounted) setState(() => isLoading = false);
+                  },
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        /// LOGIN LINK
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text("¿Ya tienes cuenta?"),
+            TextButton(
+              onPressed: widget.onLogin,
+              child: const Text("Iniciar sesión"),
+            )
+          ],
+        )
+      ],
     );
   }
 }
