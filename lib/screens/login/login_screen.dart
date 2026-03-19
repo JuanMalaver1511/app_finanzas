@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return RegisterForm(
           onLogin: () => changeView(AuthView.login),
         );
-
       default:
         return LoginForm(
           onRegister: () => changeView(AuthView.register),
@@ -40,16 +39,15 @@ class _LoginScreenState extends State<LoginScreen> {
     final isWeb = width > 900;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
       body: isWeb ? _webLayout() : _mobileLayout(),
     );
   }
 
-  /// WEB LAYOUT
+  /// WEB
   Widget _webLayout() {
     return Row(
       children: [
-
-        /// PANEL IZQUIERDO
         Expanded(
           child: Container(
             color: const Color(0xFFF5F5F5),
@@ -59,11 +57,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-
-                    /// LOGO
-                    Image.asset(
-                      "assets/images/logo.png",
-                      width: 120,
+                    TweenAnimationBuilder<double>(
+                      duration: const Duration(milliseconds: 600),
+                      tween: Tween(begin: 0.8, end: 1),
+                      curve: Curves.easeOutBack,
+                      builder: (context, value, child) {
+                        return Transform.scale(
+                          scale: value,
+                          child: child,
+                        );
+                      },
+                      child: Image.asset(
+                        "assets/images/logo.png",
+                        width: 120,
+                      ),
                     ),
 
                     const SizedBox(height: 30),
@@ -73,7 +80,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 36,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
                       ),
                     ),
 
@@ -82,10 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text(
                       "Organiza tus ingresos y gastos\nde manera inteligente.",
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(color: Colors.black54),
                     ),
                   ],
                 ),
@@ -94,7 +97,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
 
-        /// PANEL DERECHO LOGIN
         Expanded(
           child: Container(
             color: Colors.white,
@@ -102,15 +104,14 @@ class _LoginScreenState extends State<LoginScreen> {
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 transitionBuilder: (child, animation) {
-
-                  final offset = Tween(
+                  final slide = Tween<Offset>(
                     begin: const Offset(0.2, 0),
                     end: Offset.zero,
                   ).animate(animation);
 
-                  return SlideTransition(
-                    position: offset,
-                    child: child,
+                  return FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(position: slide, child: child),
                   );
                 },
                 child: SingleChildScrollView(
@@ -118,6 +119,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     key: ValueKey(currentView),
                     width: 420,
                     padding: const EdgeInsets.all(40),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 25,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
                     child: currentForm(),
                   ),
                 ),
@@ -129,33 +140,27 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// MOBILE LAYOUT
+  /// MOBILE
   Widget _mobileLayout() {
-    return Container(
-      color: const Color(0xFFF5F5F5),
-      child: Center(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          child: Container(
-            key: ValueKey(currentView),
-            width: 350,
-            padding: const EdgeInsets.all(30),
-
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                )
-              ],
-            ),
-
-            child: currentForm(),
+    return Center(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 400),
+        child: Container(
+          key: ValueKey(currentView),
+          width: 350,
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              )
+            ],
           ),
+          child: currentForm(),
         ),
       ),
     );
