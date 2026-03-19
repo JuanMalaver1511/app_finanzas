@@ -12,7 +12,7 @@ const kBg = Color(0xFFF0F2F5);
 const kCard = Colors.white;
 const kDark = Color(0xFF1A1A2E);
 const kGrey = Color(0xFF8A8A9A);
-const kGreen = Color(0xFF2ECC71);
+const kGreen = Color.fromARGB(255, 29, 126, 69);
 const kRed = Color(0xFFE74C3C);
 const kGreenBtn = Color(0xFF27AE60);
 
@@ -268,7 +268,7 @@ class _TopBar extends StatelessWidget {
                     color: kAmber, size: 20),
               ),
               const SizedBox(width: 10),
-              const Text('Finanzas',
+              const Text('KyboApp',
                   style: TextStyle(
                       fontSize: 18, fontWeight: FontWeight.bold, color: kDark)),
               const Spacer(),
@@ -594,7 +594,7 @@ class _BudgetBarsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Gastos por categoría',
+          const Text('Presupuestos',
               style: TextStyle(
                   fontSize: 14, fontWeight: FontWeight.bold, color: kDark)),
           const SizedBox(height: 16),
