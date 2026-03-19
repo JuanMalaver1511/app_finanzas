@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../login/login_screen.dart';
+import '../profile/profile_screen.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _TopBar(
                 onNew: _showAddDialog,
+                onProfile: () => Navigator.push(
+                  // ← REEMPLAZA el print
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                ),
                 onLogout: _logout,
               ),
               Expanded(
@@ -239,9 +245,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _TopBar extends StatelessWidget {
   final VoidCallback onNew;
+  final VoidCallback onProfile; // ← NUEVO
   final Future<void> Function() onLogout;
 
-  const _TopBar({required this.onNew, required this.onLogout});
+  const _TopBar({
+    required this.onNew,
+    required this.onProfile, // ← NUEVO
+    required this.onLogout,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -288,9 +299,30 @@ class _TopBar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(22)),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+
+              // ─── BOTÓN PERFIL ───────────────────────────────────────────────
+              IconButton(
+                onPressed: onProfile,
+                tooltip: 'Mi perfil',
+                icon: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(10),
+                    border:
+                        Border.all(color: const Color(0xFFBFC8F5), width: 1.2),
+                  ),
+                  child: const Icon(Icons.person_outline_rounded,
+                      color: Color(0xFF3B5BDB), size: 18),
+                ),
+              ),
+              // ───────────────────────────────────────────────────────────────
+
               IconButton(
                 onPressed: () async => await onLogout(),
+                tooltip: 'Cerrar sesión',
                 icon: const Icon(Icons.logout_rounded, color: kGrey),
               ),
             ],
@@ -316,43 +348,128 @@ class _WelcomeBanner extends StatelessWidget {
   final String name;
   const _WelcomeBanner({required this.name});
 
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return '¡Buenos días';
+    if (h < 18) return '¡Buenas tardes';
+    return '¡Buenas noches';
+  }
+
+  String get _initials {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       decoration: BoxDecoration(
-        color: kAmber,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [
+            Colors.white,
+            Color(0xFFFFF4DC), // ámbar muy suave
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Color(0xFFFFE0A0), width: 1.2),
         boxShadow: [
           BoxShadow(
-              color: kAmber.withOpacity(0.35),
-              blurRadius: 14,
-              offset: const Offset(0, 6))
+            color: kAmber.withOpacity(0.15),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Row(
         children: [
+          // Avatar con iniciales
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: kAmber.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kAmber.withOpacity(0.6), width: 1.5),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              _initials,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: kAmber,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+
+          // Textos
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('¡Bienvenido de nuevo,',
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.white.withOpacity(0.85))),
-                Text('$name! 👋',
-                    style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
-                const SizedBox(height: 4),
-                Text('Aquí tienes el resumen de tus finanzas.',
-                    style: TextStyle(
-                        fontSize: 12, color: Colors.white.withOpacity(0.75))),
+                Text(
+                  '$_greeting,',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: kGrey,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: kDark,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: kGreen,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Text(
+                      'Finanzas al día',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: kGrey,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          const Icon(Icons.bar_chart_rounded, color: Colors.white, size: 48),
+
+          // Icono decorativo
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kAmber.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kAmber.withOpacity(0.3), width: 1),
+            ),
+            child: const Icon(
+              Icons.bar_chart_rounded,
+              color: kAmber,
+              size: 26,
+            ),
+          ),
         ],
       ),
     );
@@ -971,7 +1088,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
               const SizedBox(height: 8),
               _Field(
                 controller: _titleCtrl,
-                hint: 'Ej: Supermercado',
+                hint: 'Ej: Compra de comida',
               ),
               const SizedBox(height: 16),
 
