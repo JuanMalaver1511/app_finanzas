@@ -50,11 +50,15 @@ class _RegisterFormState extends State<RegisterForm> {
     );
   }
 
-  /// REGISTER
+  /// ===============
+  /// REGISTER EMAIL 
+  /// ===============
   Future<void> _register() async {
-    if (nameController.text.trim().isEmpty ||
-        emailController.text.trim().isEmpty ||
-        passwordController.text.trim().isEmpty) {
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
       showCustomAlert(
         context,
         message: "Completa todos los campos",
@@ -66,30 +70,34 @@ class _RegisterFormState extends State<RegisterForm> {
     setState(() => isLoading = true);
 
     try {
-      final user = await _auth.registerWithEmail(
-        emailController.text.trim(),
-        passwordController.text.trim(),
+      final user = await _auth.registerWithEmail(email, password);
+
+      if (user == null) {
+        throw Exception("No se pudo crear el usuario");
+      }
+
+      /// USUARIO CON SEGURIDAD
+      await _firestore.createUser(
+        AppUser(
+          uid: user.uid,
+          name: name,
+          email: email,
+          role: 'user',
+
+          isActive: true,
+          failedAttempts: 0,
+          lastLogin: DateTime.now(),
+        ),
       );
 
       if (!mounted) return;
 
-      if (user != null) {
-        /// 🔥 GUARDAR EN FIRESTORE
-        await _firestore.createUser(
-          AppUser(
-            uid: user.uid,
-            name: nameController.text.trim(),
-            email: emailController.text.trim(),
-          ),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const DashboardScreen(),
-          ),
-        );
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const DashboardScreen(),
+        ),
+      );
     } on FirebaseAuthException catch (e) {
       String mensaje = "Error al registrar";
 
@@ -107,11 +115,11 @@ class _RegisterFormState extends State<RegisterForm> {
         type: AlertType.error,
       );
     } catch (e) {
-      final msg = e.toString().replaceAll("Exception: ", "");
+      print("ERROR REGISTRO: $e");
 
       showCustomAlert(
         context,
-        message: msg,
+        message: "Error al guardar usuario",
         type: AlertType.error,
       );
     }
@@ -119,29 +127,53 @@ class _RegisterFormState extends State<RegisterForm> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  /// GOOGLE REGISTER
+  /// =================
+  /// GOOGLE REGISTER 
+  /// =================
   Future<void> _googleRegister() async {
     setState(() => isLoading = true);
 
     try {
       final user = await _auth.loginWithGoogle();
 
-      if (!mounted) return;
+      if (user == null) return;
 
-      if (user != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const DashboardScreen(),
+      final email = user.email ?? "";
+
+      String name;
+      if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
+        name = user.displayName!;
+      } else {
+        name = email.split('@')[0];
+      }
+
+      final existingUser = await _firestore.getUser(user.uid);
+
+      if (existingUser == null) {
+        await _firestore.createUser(
+          AppUser(
+            uid: user.uid,
+            name: name,
+            email: email,
+            role: 'user',
+
+            isActive: true,
+            failedAttempts: 0,
+            lastLogin: DateTime.now(),
           ),
         );
       }
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const DashboardScreen(),
+        ),
+      );
     } catch (e) {
-      if (e is FirebaseAuthException &&
-          e.code == 'popup-closed-by-user') {
-        if (mounted) setState(() => isLoading = false);
-        return;
-      }
+      print("ERROR GOOGLE: $e");
 
       showCustomAlert(
         context,
@@ -153,6 +185,9 @@ class _RegisterFormState extends State<RegisterForm> {
     if (mounted) setState(() => isLoading = false);
   }
 
+  /// =====
+  /// UI 
+  /// =====
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -204,8 +239,10 @@ class _RegisterFormState extends State<RegisterForm> {
             ),
             child: isLoading
                 ? const CircularProgressIndicator(color: Colors.black)
-                : const Text("Registrarse",
-                    style: TextStyle(color: Colors.black)),
+                : const Text(
+                    "Registrarse",
+                    style: TextStyle(color: Colors.black),
+                  ),
           ),
         ),
 
