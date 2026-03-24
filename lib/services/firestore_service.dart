@@ -8,7 +8,10 @@ class FirestoreService {
   /// CREAR USUARIO
   /// ==============================
   Future<void> createUser(AppUser user) async {
-    await _db.collection('users').doc(user.uid).set(user.toMap());
+    await _db.collection('users').doc(user.uid).set({
+      ...user.toMap(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 
   /// ==============================
@@ -52,9 +55,7 @@ class FirestoreService {
   Future<List<AppUser>> getAllUsers() async {
     final snapshot = await _db.collection('users').get();
 
-    return snapshot.docs
-        .map((doc) => AppUser.fromMap(doc.data()))
-        .toList();
+    return snapshot.docs.map((doc) => AppUser.fromMap(doc.data())).toList();
   }
 
   /// ==============================
@@ -133,5 +134,13 @@ class FirestoreService {
         });
       }
     }
+  }
+
+  /// ==============================
+  /// STREAM DE USUARIOS (ADMIN)
+  /// ==============================
+  Stream<List<AppUser>> getUsersStream() {
+    return _db.collection('users').snapshots().map((snapshot) =>
+        snapshot.docs.map((doc) => AppUser.fromMap(doc.data())).toList());
   }
 }

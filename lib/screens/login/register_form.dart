@@ -86,7 +86,9 @@ class _RegisterFormState extends State<RegisterForm> {
 
           isActive: true,
           failedAttempts: 0,
-          lastLogin: DateTime.now(),
+
+          lastLogin: DateTime.now(),   
+          createdAt: DateTime.now(),   
         ),
       );
 
@@ -159,7 +161,9 @@ class _RegisterFormState extends State<RegisterForm> {
 
             isActive: true,
             failedAttempts: 0,
+
             lastLogin: DateTime.now(),
+            createdAt: DateTime.now(), 
           ),
         );
       }

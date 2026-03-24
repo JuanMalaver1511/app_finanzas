@@ -9,8 +9,9 @@ class AppUser {
   /// SEGURIDAD
   final bool isActive;
   final int failedAttempts;
-  final DateTime? lastLogin;
 
+  final DateTime? lastLogin;
+  final DateTime? createdAt; 
   AppUser({
     required this.uid,
     required this.name,
@@ -20,7 +21,9 @@ class AppUser {
     /// VALORES POR DEFECTO
     this.isActive = true,
     this.failedAttempts = 0,
+
     this.lastLogin,
+    this.createdAt, 
   });
 
   /// ==============================
@@ -36,7 +39,9 @@ class AppUser {
       /// SEGURIDAD
       'isActive': isActive,
       'failedAttempts': failedAttempts,
+
       'lastLogin': lastLogin,
+      'createdAt': createdAt, 
     };
   }
 
@@ -45,17 +50,22 @@ class AppUser {
   /// ==============================
   factory AppUser.fromMap(Map<String, dynamic> map) {
     return AppUser(
-      uid: map['uid'],
-      name: map['name'],
-      email: map['email'],
+      uid: map['uid'] ?? '',
+      name: map['name'] ?? '',
+      email: map['email'] ?? '',
       role: map['role'] ?? 'user',
 
       /// SEGURIDAD
       isActive: map['isActive'] ?? true,
       failedAttempts: map['failedAttempts'] ?? 0,
+
       lastLogin: map['lastLogin'] != null
           ? (map['lastLogin'] as Timestamp).toDate()
           : null,
+
+      createdAt: map['createdAt'] != null
+          ? (map['createdAt'] as Timestamp).toDate()
+          : null, 
     );
   }
 }

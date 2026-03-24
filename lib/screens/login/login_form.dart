@@ -54,7 +54,7 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   /// ==============================
-  /// 🔐 RECUPERAR CONTRASEÑA (FIX)
+  /// RECUPERAR CONTRASEÑA
   /// ==============================
   void _showResetDialog() {
     final emailCtrl = TextEditingController();
@@ -132,7 +132,7 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   /// ==============================
-  /// LOGIN PRO CON SEGURIDAD
+  /// LOGIN PRO
   /// ==============================
   Future<void> _login() async {
     final email = emailController.text.trim();
@@ -166,18 +166,21 @@ class _LoginFormState extends State<LoginForm> {
       if (user != null) {
         final userData = await _firestore.getUser(user.uid);
 
-        /// 🚫 BLOQUEADO
+        /// BLOQUEO REAL
         if (userData != null && userData.isActive == false) {
+          await FirebaseAuth.instance.signOut(); // 👈 IMPORTANTE
+
           showCustomAlert(
             context,
             message: "Tu cuenta está bloqueada",
             type: AlertType.error,
           );
+
           setState(() => isLoading = false);
           return;
         }
 
-        /// 🔄 RESET LOGIN DATA
+        /// ACTUALIZA ÚLTIMO LOGIN
         await _firestore.updateUserLoginData(user.uid);
 
         final role = userData?.role ?? 'user';
@@ -203,7 +206,7 @@ class _LoginFormState extends State<LoginForm> {
     } on FirebaseAuthException catch (e) {
       final email = emailController.text.trim();
 
-      /// 🔥 SUMAR INTENTOS FALLIDOS
+      /// INTENTOS FALLIDOS
       await _firestore.incrementFailedAttemptsByEmail(email);
 
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
@@ -259,15 +262,20 @@ class _LoginFormState extends State<LoginForm> {
       if (user != null) {
         final userData = await _firestore.getUser(user.uid);
 
+        /// BLOQUEO REAL
         if (userData != null && userData.isActive == false) {
+          await FirebaseAuth.instance.signOut(); // 👈 IMPORTANTE
+
           showCustomAlert(
             context,
             message: "Tu cuenta está bloqueada",
             type: AlertType.error,
           );
+
           return;
         }
 
+        /// ACTUALIZA ÚLTIMO LOGIN
         await _firestore.updateUserLoginData(user.uid);
 
         final role = userData?.role ?? 'user';
@@ -331,7 +339,7 @@ class _LoginFormState extends State<LoginForm> {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
-            onPressed: _showResetDialog, // 🔥 YA FUNCIONA
+            onPressed: _showResetDialog,
             child: const Text("¿Olvidaste tu contraseña?"),
           ),
         ),
