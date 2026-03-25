@@ -27,32 +27,86 @@ class _RegisterFormState extends State<RegisterForm> {
   final FirestoreService _firestore = FirestoreService();
 
   bool isLoading = false;
+  bool _obscurePassword = true;
 
+  /// ==============================
+  /// INPUT PRO
+  /// ==============================
   Widget _input({
     required TextEditingController controller,
     required String hint,
     required IconData icon,
     bool isPassword = false,
   }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.black54),
-        filled: true,
-        fillColor: const Color(0xFFF2F2F2),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide.none,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword ? _obscurePassword : false,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(
+            color: Colors.black45,
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(icon, color: Colors.black54),
+
+          // 👁️ VER CONTRASEÑA
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    _obscurePassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: Colors.black54,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                )
+              : null,
+
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(
+              color: Color(0xFFFFB84E),
+              width: 1.5,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  /// ===============
-  /// REGISTER EMAIL 
-  /// ===============
+  /// ==============================
+  /// REGISTER
+  /// ==============================
   Future<void> _register() async {
     final name = nameController.text.trim();
     final email = emailController.text.trim();
@@ -76,19 +130,16 @@ class _RegisterFormState extends State<RegisterForm> {
         throw Exception("No se pudo crear el usuario");
       }
 
-      /// USUARIO CON SEGURIDAD
       await _firestore.createUser(
         AppUser(
           uid: user.uid,
           name: name,
           email: email,
           role: 'user',
-
           isActive: true,
           failedAttempts: 0,
-
-          lastLogin: DateTime.now(),   
-          createdAt: DateTime.now(),   
+          lastLogin: DateTime.now(),
+          createdAt: DateTime.now(),
         ),
       );
 
@@ -117,8 +168,6 @@ class _RegisterFormState extends State<RegisterForm> {
         type: AlertType.error,
       );
     } catch (e) {
-      print("ERROR REGISTRO: $e");
-
       showCustomAlert(
         context,
         message: "Error al guardar usuario",
@@ -129,9 +178,9 @@ class _RegisterFormState extends State<RegisterForm> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  /// =================
-  /// GOOGLE REGISTER 
-  /// =================
+  /// ==============================
+  /// GOOGLE REGISTER
+  /// ==============================
   Future<void> _googleRegister() async {
     setState(() => isLoading = true);
 
@@ -142,12 +191,9 @@ class _RegisterFormState extends State<RegisterForm> {
 
       final email = user.email ?? "";
 
-      String name;
-      if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
-        name = user.displayName!;
-      } else {
-        name = email.split('@')[0];
-      }
+      String name = user.displayName?.trim().isNotEmpty == true
+          ? user.displayName!
+          : email.split('@')[0];
 
       final existingUser = await _firestore.getUser(user.uid);
 
@@ -158,12 +204,10 @@ class _RegisterFormState extends State<RegisterForm> {
             name: name,
             email: email,
             role: 'user',
-
             isActive: true,
             failedAttempts: 0,
-
             lastLogin: DateTime.now(),
-            createdAt: DateTime.now(), 
+            createdAt: DateTime.now(),
           ),
         );
       }
@@ -176,9 +220,7 @@ class _RegisterFormState extends State<RegisterForm> {
           builder: (_) => const DashboardScreen(),
         ),
       );
-    } catch (e) {
-      print("ERROR GOOGLE: $e");
-
+    } catch (_) {
       showCustomAlert(
         context,
         message: "Error con Google",
@@ -189,94 +231,130 @@ class _RegisterFormState extends State<RegisterForm> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  /// =====
-  /// UI 
-  /// =====
+  /// ==============================
+  /// UI
+  /// ==============================
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset("assets/images/logo.png", width: 70),
-        const SizedBox(height: 20),
-        const Text(
-          "Crear cuenta",
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 30),
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset("assets/images/logo.png", width: 70),
+              const SizedBox(height: 20),
 
-        _input(
-          controller: nameController,
-          hint: "Nombre",
-          icon: Icons.person_outline,
-        ),
-
-        const SizedBox(height: 16),
-
-        _input(
-          controller: emailController,
-          hint: "Correo electrónico",
-          icon: Icons.email_outlined,
-        ),
-
-        const SizedBox(height: 16),
-
-        _input(
-          controller: passwordController,
-          hint: "Contraseña",
-          icon: Icons.lock_outline,
-          isPassword: true,
-        ),
-
-        const SizedBox(height: 25),
-
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _register,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFB84E),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
+              const Text(
+                "Crear cuenta",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
+                ),
               ),
-            ),
-            child: isLoading
-                ? const CircularProgressIndicator(color: Colors.black)
-                : const Text(
-                    "Registrarse",
-                    style: TextStyle(color: Colors.black),
+
+              const SizedBox(height: 30),
+
+              _input(
+                controller: nameController,
+                hint: "Nombre",
+                icon: Icons.person_outline,
+              ),
+
+              const SizedBox(height: 16),
+
+              _input(
+                controller: emailController,
+                hint: "Correo electrónico",
+                icon: Icons.email_outlined,
+              ),
+
+              const SizedBox(height: 16),
+
+              _input(
+                controller: passwordController,
+                hint: "Contraseña",
+                icon: Icons.lock_outline,
+                isPassword: true,
+              ),
+
+              const SizedBox(height: 10),
+
+              const SizedBox(height: 25),
+
+              /// 🔥 BOTÓN PRO
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: isLoading ? null : _register,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB84E),
+                    elevation: 1.5,
+                    shadowColor: Colors.black12,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  child: isLoading
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Text(
+                          "Registrarse",
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  icon: Image.asset("assets/images/google.png", width: 22),
+                  label: const Text("Registrarse con Google"),
+                  onPressed: isLoading ? null : _googleRegister,
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("¿Ya tienes cuenta?"),
+                  TextButton(
+                    onPressed: widget.onLogin,
+                    child: const Text("Iniciar sesión"),
+                  )
+                ],
+              ),
+            ],
           ),
         ),
-
-        const SizedBox(height: 20),
-        const Divider(),
-        const SizedBox(height: 20),
-
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton.icon(
-            icon: Image.asset("assets/images/google.png", width: 22),
-            label: const Text("Registrarse con Google"),
-            onPressed: isLoading ? null : _googleRegister,
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text("¿Ya tienes cuenta?"),
-            TextButton(
-              onPressed: widget.onLogin,
-              child: const Text("Iniciar sesión"),
-            )
-          ],
-        )
-      ],
+      ),
     );
   }
 }

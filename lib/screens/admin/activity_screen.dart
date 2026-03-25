@@ -16,6 +16,22 @@ class _ActivityScreenState extends State<ActivityScreen>
   int inactiveUsers = 0;
   int blockedUsers = 0;
 
+  String groupBy = "Día";
+
+  String selectedPeriod = "Últimos 7 días";
+
+  final List<String> periods = [
+    "Hoy",
+    "Ayer",
+    "Semana actual",
+    "Últimos 7 días",
+    "Últimos 30 días",
+    "Mes actual",
+    "Mes anterior",
+    "Año actual",
+    "Personalizado",
+  ];
+
   List<int> chartData = [];
   List<Map<String, dynamic>> recentUsers = [];
 
@@ -24,7 +40,6 @@ class _ActivityScreenState extends State<ActivityScreen>
   int daysFilter = 7;
   DateTime selectedDate = DateTime.now();
 
-  /// NUEVO (rango)
   DateTime? startDate;
   DateTime? endDate;
 
@@ -54,15 +69,14 @@ class _ActivityScreenState extends State<ActivityScreen>
 
     final snapshot = await FirebaseFirestore.instance.collection('users').get();
 
-    final now = selectedDate;
+    final now = endDate ?? DateTime.now();
     final start = startDate ?? now.subtract(Duration(days: daysFilter));
-
     int active = 0;
     int inactive = 0;
     int blocked = 0;
-
-    List<int> tempChart = List.filled(daysFilter, 0);
     List<Map<String, dynamic>> tempRecent = [];
+    int diffDays = now.difference(start).inDays + 1;
+    List<int> tempChart = List.filled(diffDays, 0);
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
@@ -81,14 +95,13 @@ class _ActivityScreenState extends State<ActivityScreen>
         inactive++;
       }
 
-      /// FILTRO CON RANGO
       if (createdAt != null &&
           createdAt.isAfter(start.subtract(const Duration(seconds: 1))) &&
           createdAt.isBefore(now.add(const Duration(seconds: 1)))) {
         final diff = now.difference(createdAt).inDays;
 
-        if (diff >= 0 && diff < daysFilter) {
-          int index = (daysFilter - 1) - diff;
+        if (diff >= 0 && diff < tempChart.length) {
+          int index = (tempChart.length - 1) - diff;
 
           if (index >= 0 && index < tempChart.length) {
             tempChart[index]++;
@@ -96,7 +109,6 @@ class _ActivityScreenState extends State<ActivityScreen>
         }
       }
 
-      /// ACTIVIDAD FILTRADA
       if (lastLogin != null &&
           lastLogin.isAfter(start) &&
           lastLogin.isBefore(now)) {
@@ -107,8 +119,8 @@ class _ActivityScreenState extends State<ActivityScreen>
       }
     }
 
-    tempRecent
-        .sort((a, b) => (b['lastLogin'] as DateTime).compareTo(a['lastLogin']));
+    tempRecent.sort((a, b) =>
+        (b['lastLogin'] as DateTime).compareTo(a['lastLogin'] as DateTime));
 
     if (!mounted) return;
 
@@ -126,7 +138,6 @@ class _ActivityScreenState extends State<ActivityScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-
     final isMobile = size.width < 600;
     final isTablet = size.width >= 600 && size.width < 1000;
 
@@ -145,80 +156,192 @@ class _ActivityScreenState extends State<ActivityScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         /// HEADER
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back),
-                                  onPressed: () => Navigator.pop(context),
-                                ),
-                                const Expanded(
-                                  child: Text(
-                                    "Dashboard de usuarios",
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back),
+                              onPressed: () => Navigator.pop(context),
                             ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: [
-                                /// 🔥 BOTÓN MINIMALISTA
-                                IconButton(
-                                  icon: const Icon(Icons.date_range),
-                                  tooltip: "Filtrar por rango",
-                                  onPressed: () async {
-                                    final range = await showDateRangePicker(
-                                      context: context,
-                                      firstDate: DateTime(2020),
-                                      lastDate: DateTime.now(),
-
-                                      /// 🔥 ESPAÑOL
-                                      locale: const Locale('es', 'ES'),
-                                    );
-
-                                    if (range != null) {
-                                      setState(() {
-                                        startDate = range.start;
-                                        endDate = range.end;
-                                        selectedDate = range.end;
-                                        daysFilter = range.end
-                                                .difference(range.start)
-                                                .inDays +
-                                            1;
-                                      });
-
-                                      _loadData();
-                                    }
-                                  },
+                            const Expanded(
+                              child: Text(
+                                "Dashboard de usuarios",
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
                                 ),
+                              ),
+                            ),
+                          ],
+                        ),
 
-                                DropdownButton<int>(
-                                  value: daysFilter,
-                                  items: const [
-                                    DropdownMenuItem(
-                                        value: 7, child: Text("7 días")),
-                                    DropdownMenuItem(
-                                        value: 30, child: Text("30 días")),
-                                  ],
-                                  onChanged: (value) {
-                                    setState(() {
-                                      daysFilter = value!;
-                                      startDate = null;
-                                      endDate = null;
-                                    });
-                                    _loadData();
-                                  },
-                                ),
-                              ],
+                        const SizedBox(height: 10),
+
+                        /// FILTROS PRO
+                        Row(
+                          children: [
+                            /// 🔥 FILTRO PERIODO
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Periodo",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _filterBox(
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<String>(
+                                        value: selectedPeriod,
+                                        isExpanded: true,
+                                        items: periods.map((p) {
+                                          return DropdownMenuItem(
+                                            value: p,
+                                            child: Text(p),
+                                          );
+                                        }).toList(),
+                                        onChanged: (value) {
+                                          setState(
+                                              () => selectedPeriod = value!);
+
+                                          final now = DateTime.now();
+
+                                          switch (value) {
+                                            case "Hoy":
+                                              startDate = DateTime(
+                                                  now.year, now.month, now.day);
+                                              endDate = now;
+                                              break;
+
+                                            case "Ayer":
+                                              final ayer = now.subtract(
+                                                  const Duration(days: 1));
+                                              startDate = DateTime(ayer.year,
+                                                  ayer.month, ayer.day);
+                                              endDate = ayer;
+                                              break;
+
+                                            case "Semana actual":
+                                              final startWeek = now.subtract(
+                                                  Duration(
+                                                      days: now.weekday - 1));
+                                              startDate = DateTime(
+                                                  startWeek.year,
+                                                  startWeek.month,
+                                                  startWeek.day);
+                                              endDate = now;
+                                              break;
+
+                                            case "Últimos 7 días":
+                                              startDate = now.subtract(
+                                                  const Duration(days: 7));
+                                              endDate = now;
+                                              break;
+
+                                            case "Últimos 30 días":
+                                              startDate = now.subtract(
+                                                  const Duration(days: 30));
+                                              endDate = now;
+                                              break;
+
+                                            case "Mes actual":
+                                              startDate = DateTime(
+                                                  now.year, now.month, 1);
+                                              endDate = now;
+                                              break;
+
+                                            case "Mes anterior":
+                                              final prevMonth = DateTime(
+                                                  now.year, now.month - 1, 1);
+                                              startDate = prevMonth;
+                                              endDate = DateTime(
+                                                  now.year, now.month, 0);
+                                              break;
+
+                                            case "Año actual":
+                                              startDate =
+                                                  DateTime(now.year, 1, 1);
+                                              endDate = now;
+                                              break;
+
+                                            case "Personalizado":
+                                              return;
+                                          }
+
+                                          _loadData();
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(width: 12),
+
+                            /// 🔥 FILTRO FECHA
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Rango de fechas",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  GestureDetector(
+                                    onTap: () async {
+                                      final picked = await showDateRangePicker(
+                                        context: context,
+                                        initialDateRange:
+                                            startDate != null && endDate != null
+                                                ? DateTimeRange(
+                                                    start: startDate!,
+                                                    end: endDate!)
+                                                : null,
+                                        firstDate: DateTime(2020),
+                                        lastDate: DateTime.now(),
+                                        locale: const Locale('es'),
+                                      );
+
+                                      if (picked != null) {
+                                        setState(() {
+                                          startDate = picked.start;
+                                          endDate = picked.end;
+                                          selectedPeriod = "Personalizado";
+                                        });
+
+                                        _loadData();
+                                      }
+                                    },
+                                    child: _filterBox(
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.date_range,
+                                              size: 18),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              startDate != null &&
+                                                      endDate != null
+                                                  ? "${startDate!.day}/${startDate!.month} - ${endDate!.day}/${endDate!.month}"
+                                                  : "Seleccionar",
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const Icon(Icons.arrow_drop_down),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -243,7 +366,7 @@ class _ActivityScreenState extends State<ActivityScreen>
 
                         const SizedBox(height: 20),
 
-                        /// GRÁFICAS
+                        /// GRAFICAS
                         isMobile
                             ? Column(
                                 children: [
@@ -262,22 +385,7 @@ class _ActivityScreenState extends State<ActivityScreen>
 
                         const SizedBox(height: 20),
 
-                        /// CALENDARIO + LISTA
-                        isMobile
-                            ? Column(
-                                children: [
-                                  _calendar(isMobile),
-                                  const SizedBox(height: 20),
-                                  _recentUsers(),
-                                ],
-                              )
-                            : Row(
-                                children: [
-                                  Expanded(child: _calendar(isMobile)),
-                                  const SizedBox(width: 20),
-                                  Expanded(child: _recentUsers()),
-                                ],
-                              ),
+                        _recentUsers(),
                       ],
                     ),
                   ),
@@ -343,22 +451,101 @@ class _ActivityScreenState extends State<ActivityScreen>
 
   Widget _growthChart(bool isMobile) {
     return _card(
-      child: SizedBox(
-        height: isMobile ? 180 : 220,
-        child: LineChart(
-          LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: List.generate(
-                  chartData.length,
-                  (i) => FlSpot(i.toDouble(), chartData[i].toDouble()),
-                ),
-                isCurved: true,
-                color: Colors.blue,
-              )
-            ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          /// 🔥 TÍTULO
+          const Text(
+            "Usuarios registrados",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
+
+          const SizedBox(height: 20),
+
+          SizedBox(
+            height: isMobile ? 180 : 220,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  horizontalInterval: 1,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: Colors.grey.withOpacity(0.2),
+                    strokeWidth: 1,
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(fontSize: 10),
+                        );
+                      },
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 1,
+                      getTitlesWidget: (value, meta) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            "D${value.toInt() + 1}",
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: List.generate(
+                      chartData.length,
+                      (i) => FlSpot(i.toDouble(), chartData[i].toDouble()),
+                    ),
+                    isCurved: true,
+                    color: const Color(0xFF3B82F6),
+                    barWidth: 3,
+                    dotData: FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: const Color(0xFF3B82F6).withOpacity(0.15),
+                    ),
+                  ),
+                ],
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    tooltipBgColor: Colors.black87,
+                    getTooltipItems: (touchedSpots) {
+                      return touchedSpots.map((spot) {
+                        return LineTooltipItem(
+                          "${spot.y.toInt()} usuarios",
+                          const TextStyle(color: Colors.white),
+                        );
+                      }).toList();
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -368,26 +555,64 @@ class _ActivityScreenState extends State<ActivityScreen>
 
     return _card(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Distribución de usuarios",
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: isMobile ? 180 : 200,
-            child: PieChart(
-              PieChartData(
-                centerSpaceRadius: 40,
-                sections: [
-                  _section(activeUsers, Colors.green),
-                  _section(inactiveUsers, Colors.orange),
-                  _section(blockedUsers, Colors.red),
-                ],
-              ),
+          /// 🔥 TÍTULO
+          const Text(
+            "Distribución de usuarios",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
           ),
-          _legend("Activos", activeUsers, total, Colors.green),
-          _legend("Inactivos", inactiveUsers, total, Colors.orange),
-          _legend("Bloqueados", blockedUsers, total, Colors.red),
+
+          const SizedBox(height: 20),
+
+          /// 🔥 DONUT + TOTAL CENTRO
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                height: isMobile ? 180 : 200,
+                child: PieChart(
+                  PieChartData(
+                    centerSpaceRadius: 50,
+                    sectionsSpace: 2,
+                    sections: [
+                      _section(activeUsers, Colors.green),
+                      _section(inactiveUsers, Colors.orange),
+                      _section(blockedUsers, Colors.red),
+                    ],
+                  ),
+                ),
+              ),
+
+              /// 🔥 TOTAL EN EL CENTRO
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    "Total",
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    "$totalUsers",
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          /// 🔥 LEYENDA PRO
+          _legendItem("Activos", activeUsers, total, Colors.green),
+          _legendItem("Inactivos", inactiveUsers, total, Colors.orange),
+          _legendItem("Bloqueados", blockedUsers, total, Colors.red),
         ],
       ),
     );
@@ -401,14 +626,37 @@ class _ActivityScreenState extends State<ActivityScreen>
     );
   }
 
-  Widget _legend(String title, int value, int total, Color color) {
-    final percent = (value / total) * 100;
-    return Row(
-      children: [
-        Container(width: 10, height: 10, color: color),
-        const SizedBox(width: 6),
-        Text("$title (${percent.toStringAsFixed(1)}%)"),
-      ],
+  Widget _legendItem(String title, int value, int total, Color color) {
+    final percent = ((value / total) * 100).toStringAsFixed(1);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          /// COLOR
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          /// TEXTO
+          Expanded(
+            child: Text(title),
+          ),
+
+          /// VALOR + %
+          Text(
+            "$value ($percent%)",
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
     );
   }
 
@@ -417,52 +665,66 @@ class _ActivityScreenState extends State<ActivityScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Actividad reciente",
-              style: TextStyle(fontWeight: FontWeight.bold)),
-          ...recentUsers.map((u) {
-            final d = u['lastLogin'] as DateTime;
-            return ListTile(
-              dense: true,
-              title: Text(u['name']),
-              subtitle: Text(
-                  "${d.day}/${d.month} ${d.hour}:${d.minute.toString().padLeft(2, '0')}"),
-            );
-          })
-        ],
-      ),
-    );
-  }
+          /// 🔥 TÍTULO
+          const Text(
+            "Actividad reciente",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
 
-  Widget _calendar(bool isMobile) {
-    return _card(
-      child: SizedBox(
-        height: isMobile ? 280 : 300,
-        child: CalendarDatePicker(
-          initialDate: selectedDate,
-          firstDate: DateTime(2020),
-          lastDate: DateTime.now(),
-          onDateChanged: (date) {
-            setState(() {
-              selectedDate = date;
-              startDate = null;
-              endDate = null;
-            });
-            _loadData();
-          },
-        ),
+          const SizedBox(height: 10),
+
+          /// 🔥 LISTA
+          if (recentUsers.isEmpty) const Text("No hay actividad reciente"),
+
+          ...recentUsers.map((u) {
+            final d = u['lastLogin'] as DateTime?;
+
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFFFB84E),
+                child: Icon(Icons.person, color: Colors.black),
+              ),
+              title: Text(
+                u['name'],
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              subtitle: d != null
+                  ? Text(
+                      "${d.day}/${d.month} - ${d.hour}:${d.minute.toString().padLeft(2, '0')}",
+                    )
+                  : const Text("Sin fecha"),
+            );
+          }),
+        ],
       ),
     );
   }
 
   Widget _card({required Widget child}) {
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: child,
+    );
+  }
+
+  Widget _filterBox({required Widget child}) {
+    return Container(
+      height: 48, // 🔥 MISMA ALTURA PARA TODO
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Center(child: child),
     );
   }
 }

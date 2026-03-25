@@ -27,8 +27,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _loadUserStats() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('users').get();
+    final snapshot = await FirebaseFirestore.instance.collection('users').get();
 
     int total = snapshot.docs.length;
     int active = 0;
@@ -50,7 +49,7 @@ class _AdminScreenState extends State<AdminScreen> {
       activeUsers = active;
       blockedUsers = blocked;
 
-      /// 🔥 CALCULAR PORCENTAJES
+      /// CALCULAR PORCENTAJES
       activePercent = total == 0 ? 0 : (active / total) * 100;
       blockedPercent = total == 0 ? 0 : (blocked / total) * 100;
 
@@ -59,6 +58,39 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _logout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text("Cerrar sesión"),
+          content: const Text("¿Estás seguro de que deseas cerrar sesión?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancelar"),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFB84E),
+              ),
+              child: const Text(
+                "Cerrar sesión",
+                style: TextStyle(color: Colors.black),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    // Si cancela → no hace nada
+    if (confirm != true) return;
+
+    // Cierra sesión
     await FirebaseAuth.instance.signOut();
 
     Navigator.pushNamedAndRemoveUntil(
@@ -74,16 +106,14 @@ class _AdminScreenState extends State<AdminScreen> {
     final isMobile = width < 700;
 
     final user = FirebaseAuth.instance.currentUser;
-    final userName = user?.displayName ??
-        user?.email?.split('@').first ??
-        'Admin';
+    final userName =
+        user?.displayName ?? user?.email?.split('@').first ?? 'Admin';
 
     return Scaffold(
       drawer: isMobile ? _buildDrawer(context) : null,
       body: Row(
         children: [
-
-          /// 🔥 SIDEBAR
+          /// SIDEBAR
           if (!isMobile)
             Container(
               width: 80,
@@ -97,16 +127,13 @@ class _AdminScreenState extends State<AdminScreen> {
                       const Icon(Icons.admin_panel_settings,
                           color: Colors.white, size: 30),
                       const SizedBox(height: 30),
-
                       SidebarIcon(icon: Icons.dashboard, onTap: () {}),
-
                       SidebarIcon(
                         icon: Icons.people,
                         onTap: () {
                           Navigator.pushNamed(context, '/users');
                         },
                       ),
-
                       SidebarIcon(
                         icon: Icons.bar_chart,
                         onTap: () {
@@ -115,7 +142,6 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                     ],
                   ),
-
                   Padding(
                     padding: const EdgeInsets.all(12),
                     child: SidebarIcon(
@@ -134,7 +160,6 @@ class _AdminScreenState extends State<AdminScreen> {
               child: SafeArea(
                 child: Column(
                   children: [
-
                     /// HEADER
                     Padding(
                       padding: const EdgeInsets.symmetric(
@@ -142,7 +167,6 @@ class _AdminScreenState extends State<AdminScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-
                           Row(
                             children: [
                               if (isMobile)
@@ -154,7 +178,6 @@ class _AdminScreenState extends State<AdminScreen> {
                                     },
                                   ),
                                 ),
-
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -173,12 +196,10 @@ class _AdminScreenState extends State<AdminScreen> {
                               ),
                             ],
                           ),
-
                           Row(
                             children: [
                               const Icon(Icons.notifications_none),
                               const SizedBox(width: 12),
-
                               GestureDetector(
                                 onTap: () {
                                   Navigator.pushNamed(context, '/profile');
@@ -186,8 +207,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 child: MouseRegion(
                                   cursor: SystemMouseCursors.click,
                                   child: CircleAvatar(
-                                    backgroundColor:
-                                        Colors.orange.shade200,
+                                    backgroundColor: Colors.orange.shade200,
                                     child: Text(
                                       userName[0].toUpperCase(),
                                     ),
@@ -207,9 +227,7 @@ class _AdminScreenState extends State<AdminScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
                             const SizedBox(height: 10),
-
                             isLoading
                                 ? const Center(
                                     child: CircularProgressIndicator())
@@ -217,8 +235,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                     spacing: 20,
                                     runSpacing: 20,
                                     children: [
-
-                                      /// 👥 USUARIOS
+                                      /// USUARIOS
                                       _HoverCard(
                                         icon: Icons.people,
                                         title: "Usuarios",
@@ -233,14 +250,13 @@ class _AdminScreenState extends State<AdminScreen> {
                                         },
                                       ),
 
-                                      /// 📊 ACTIVIDAD
+                                      /// ACTIVIDAD
                                       _HoverCard(
                                         icon: Icons.bar_chart,
                                         title: "Actividad",
                                         value:
                                             "${activePercent.toStringAsFixed(0)}%",
-                                        subtitle:
-                                            "Usuarios activos del total",
+                                        subtitle: "Usuarios activos del total",
                                         color: Colors.orange,
                                         onTap: () {
                                           Navigator.pushNamed(
@@ -249,7 +265,6 @@ class _AdminScreenState extends State<AdminScreen> {
                                       ),
                                     ],
                                   ),
-
                             const SizedBox(height: 40),
                           ],
                         ),
@@ -271,7 +286,6 @@ class _AdminScreenState extends State<AdminScreen> {
       child: Column(
         children: [
           const DrawerHeader(child: Text("Menú")),
-
           ListTile(
             leading: const Icon(Icons.people),
             title: const Text("Usuarios"),
@@ -280,7 +294,6 @@ class _AdminScreenState extends State<AdminScreen> {
               Navigator.pushNamed(context, '/users');
             },
           ),
-
           ListTile(
             leading: const Icon(Icons.bar_chart),
             title: const Text("Estadísticas"),
@@ -289,7 +302,6 @@ class _AdminScreenState extends State<AdminScreen> {
               Navigator.pushNamed(context, '/activity');
             },
           ),
-
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text("Cerrar sesión"),
@@ -301,7 +313,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 }
 
-/// 🔥 CARD PRO
+/// CARD 
 class _HoverCard extends StatefulWidget {
   final IconData icon;
   final String title;
@@ -349,9 +361,7 @@ class _HoverCardState extends State<_HoverCard> {
               )
             ],
           ),
-          transform: Matrix4.identity()
-            ..scale(isHover ? 1.03 : 1.0),
-
+          transform: Matrix4.identity()..scale(isHover ? 1.03 : 1.0),
           child: Row(
             children: [
               Container(
@@ -362,18 +372,14 @@ class _HoverCardState extends State<_HoverCard> {
                 ),
                 child: Icon(widget.icon, color: widget.color),
               ),
-
               const SizedBox(width: 15),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(widget.title,
                         style: const TextStyle(color: Colors.grey)),
-
                     Text(
                       widget.value,
                       style: const TextStyle(
@@ -381,12 +387,10 @@ class _HoverCardState extends State<_HoverCard> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
                     Text(
                       widget.subtitle,
                       style: const TextStyle(fontSize: 12),
                     ),
-
                     const Text(
                       "Ver detalles →",
                       style: TextStyle(color: Colors.blue),

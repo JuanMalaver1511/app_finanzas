@@ -26,28 +26,74 @@ class _LoginFormState extends State<LoginForm> {
   final FirestoreService _firestore = FirestoreService();
 
   bool isLoading = false;
+  bool _obscurePassword = true;
 
   bool _isValidEmail(String email) {
     return email.contains("@") && email.contains(".");
   }
 
+  /// ==============================
+  /// INPUT PRO
+  /// ==============================
   Widget _input({
     required TextEditingController controller,
     required String hint,
     required IconData icon,
     bool isPassword = false,
   }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.black54),
-        filled: true,
-        fillColor: const Color(0xFFF2F2F2),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide.none,
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword ? _obscurePassword : false,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(
+            color: Colors.black45,
+            fontSize: 14,
+          ),
+          prefixIcon: Icon(icon, color: Colors.black54),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.black54,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(
+              color: Color(0xFFFFB84E),
+              width: 1.5,
+            ),
+          ),
         ),
       ),
     );
@@ -66,6 +112,9 @@ class _LoginFormState extends State<LoginForm> {
         return StatefulBuilder(
           builder: (context, setStateModal) {
             return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               title: const Text("Recuperar contraseña"),
               content: TextField(
                 controller: emailCtrl,
@@ -115,6 +164,9 @@ class _LoginFormState extends State<LoginForm> {
 
                           setStateModal(() => loading = false);
                         },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB84E),
+                  ),
                   child: loading
                       ? const SizedBox(
                           height: 20,
@@ -132,7 +184,7 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   /// ==============================
-  /// LOGIN PRO
+  /// LOGIN
   /// ==============================
   Future<void> _login() async {
     final email = emailController.text.trim();
@@ -166,9 +218,8 @@ class _LoginFormState extends State<LoginForm> {
       if (user != null) {
         final userData = await _firestore.getUser(user.uid);
 
-        /// BLOQUEO REAL
         if (userData != null && userData.isActive == false) {
-          await FirebaseAuth.instance.signOut(); // 👈 IMPORTANTE
+          await FirebaseAuth.instance.signOut();
 
           showCustomAlert(
             context,
@@ -180,7 +231,6 @@ class _LoginFormState extends State<LoginForm> {
           return;
         }
 
-        /// ACTUALIZA ÚLTIMO LOGIN
         await _firestore.updateUserLoginData(user.uid);
 
         final role = userData?.role ?? 'user';
@@ -205,8 +255,6 @@ class _LoginFormState extends State<LoginForm> {
       }
     } on FirebaseAuthException catch (e) {
       final email = emailController.text.trim();
-
-      /// INTENTOS FALLIDOS
       await _firestore.incrementFailedAttemptsByEmail(email);
 
       if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
@@ -262,9 +310,8 @@ class _LoginFormState extends State<LoginForm> {
       if (user != null) {
         final userData = await _firestore.getUser(user.uid);
 
-        /// BLOQUEO REAL
         if (userData != null && userData.isActive == false) {
-          await FirebaseAuth.instance.signOut(); // 👈 IMPORTANTE
+          await FirebaseAuth.instance.signOut();
 
           showCustomAlert(
             context,
@@ -275,7 +322,6 @@ class _LoginFormState extends State<LoginForm> {
           return;
         }
 
-        /// ACTUALIZA ÚLTIMO LOGIN
         await _firestore.updateUserLoginData(user.uid);
 
         final role = userData?.role ?? 'user';
@@ -312,85 +358,112 @@ class _LoginFormState extends State<LoginForm> {
   /// ==============================
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Image.asset("assets/images/logo.png", width: 70),
-        const SizedBox(height: 20),
-        const Text("Iniciar Sesión",
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 30),
-
-        _input(
-          controller: emailController,
-          hint: "Correo electrónico",
-          icon: Icons.email_outlined,
-        ),
-
-        const SizedBox(height: 16),
-
-        _input(
-          controller: passwordController,
-          hint: "Contraseña",
-          icon: Icons.lock_outline,
-          isPassword: true,
-        ),
-
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: _showResetDialog,
-            child: const Text("¿Olvidaste tu contraseña?"),
-          ),
-        ),
-
-        const SizedBox(height: 25),
-
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: isLoading ? null : _login,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFB84E),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset("assets/images/logo.png", width: 70),
+              const SizedBox(height: 20),
+              const Text(
+                "Iniciar Sesión",
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            child: isLoading
-                ? const CircularProgressIndicator(color: Colors.black)
-                : const Text("Ingresar",
-                    style: TextStyle(color: Colors.black)),
+              const SizedBox(height: 30),
+              _input(
+                controller: emailController,
+                hint: "Correo electrónico",
+                icon: Icons.email_outlined,
+              ),
+              const SizedBox(height: 16),
+              _input(
+                controller: passwordController,
+                hint: "Contraseña",
+                icon: Icons.lock_outline,
+                isPassword: true,
+              ),
+
+              const SizedBox(height: 8),
+              
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _showResetDialog,
+                  child: const Text("¿Olvidaste tu contraseña?"),
+                ),
+              ),
+              const SizedBox(height: 25),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: isLoading ? null : _login,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB84E),
+                    elevation: 1.5,
+                    shadowColor: Colors.black12,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Text(
+                          "Iniciar Sesión",
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  icon: Image.asset("assets/images/google.png", width: 22),
+                  label: const Text("Continuar con Google"),
+                  onPressed: isLoading ? null : _googleLogin,
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("¿No tienes cuenta?"),
+                  TextButton(
+                    onPressed: widget.onRegister,
+                    child: const Text("Crear cuenta"),
+                  )
+                ],
+              ),
+            ],
           ),
         ),
-
-        const SizedBox(height: 20),
-        const Divider(),
-        const SizedBox(height: 20),
-
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: OutlinedButton.icon(
-            icon: Image.asset("assets/images/google.png", width: 22),
-            label: const Text("Continuar con Google"),
-            onPressed: isLoading ? null : _googleLogin,
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text("¿No tienes cuenta?"),
-            TextButton(
-              onPressed: widget.onRegister,
-              child: const Text("Crear cuenta"),
-            )
-          ],
-        ),
-      ],
+      ),
     );
   }
 }

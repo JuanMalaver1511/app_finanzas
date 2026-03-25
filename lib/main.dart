@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'; // 🔥 IMPORTANTE
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_functions/cloud_functions.dart'; 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import 'firebase_options.dart';
-
 import 'core/theme/app_theme.dart';
+
+import 'screens/auth/auth_wrapper.dart';
 
 // Pantallas
 import 'screens/login/login_screen.dart';
@@ -33,21 +36,70 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-
-      // Tema global
       theme: AppTheme.lightTheme,
 
-      // Ruta inicial
-      initialRoute: '/login',
+      // 🔥 SOLUCIÓN AL ERROR
+      locale: const Locale('es'),
 
-      // Rutas de la aplicación
+      supportedLocales: const [
+        Locale('es'),
+        Locale('en'),
+      ],
+
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+
+      /// CONTROL GLOBAL DE SESIÓN
+      home: const AuthWrapper(),
+
+      /// RUTAS PROTEGIDAS
       routes: {
-        '/login': (context) => const LoginScreen(),
-        '/admin': (context) => const AdminScreen(),
-        '/users': (context) => const UsersScreen(),
-        '/activity': (context) => const ActivityScreen(),
-        '/security': (context) => const SecurityScreen(),
-        '/profile': (context) => const ProfileScreen(),
+        '/login': (context) {
+          final user = FirebaseAuth.instance.currentUser;
+
+          if (user != null) {
+            return const AdminScreen();
+          }
+
+          return const LoginScreen();
+        },
+
+        '/admin': (context) {
+          final user = FirebaseAuth.instance.currentUser;
+
+          if (user == null) {
+            return const LoginScreen();
+          }
+
+          return const AdminScreen();
+        },
+
+        '/users': (context) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) return const LoginScreen();
+          return const UsersScreen();
+        },
+
+        '/activity': (context) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) return const LoginScreen();
+          return const ActivityScreen();
+        },
+
+        '/security': (context) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) return const LoginScreen();
+          return const SecurityScreen();
+        },
+
+        '/profile': (context) {
+          final user = FirebaseAuth.instance.currentUser;
+          if (user == null) return const LoginScreen();
+          return const ProfileScreen();
+        },
       },
     );
   }
