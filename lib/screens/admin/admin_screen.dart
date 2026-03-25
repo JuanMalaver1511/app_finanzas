@@ -17,6 +17,9 @@ class _AdminScreenState extends State<AdminScreen> {
 
   bool isLoading = true;
 
+  double activePercent = 0;
+  double blockedPercent = 0;
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +49,11 @@ class _AdminScreenState extends State<AdminScreen> {
       totalUsers = total;
       activeUsers = active;
       blockedUsers = blocked;
+
+      /// 🔥 CALCULAR PORCENTAJES
+      activePercent = total == 0 ? 0 : (active / total) * 100;
+      blockedPercent = total == 0 ? 0 : (blocked / total) * 100;
+
       isLoading = false;
     });
   }
@@ -75,7 +83,7 @@ class _AdminScreenState extends State<AdminScreen> {
       body: Row(
         children: [
 
-          /// SIDEBAR DESKTOP
+          /// 🔥 SIDEBAR
           if (!isMobile)
             Container(
               width: 80,
@@ -96,6 +104,13 @@ class _AdminScreenState extends State<AdminScreen> {
                         icon: Icons.people,
                         onTap: () {
                           Navigator.pushNamed(context, '/users');
+                        },
+                      ),
+
+                      SidebarIcon(
+                        icon: Icons.bar_chart,
+                        onTap: () {
+                          Navigator.pushNamed(context, '/activity');
                         },
                       ),
                     ],
@@ -185,7 +200,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                     ),
 
-                    /// CONTENIDO SCROLL
+                    /// BODY
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -195,7 +210,6 @@ class _AdminScreenState extends State<AdminScreen> {
 
                             const SizedBox(height: 10),
 
-                            /// CARDS
                             isLoading
                                 ? const Center(
                                     child: CircularProgressIndicator())
@@ -204,12 +218,14 @@ class _AdminScreenState extends State<AdminScreen> {
                                     runSpacing: 20,
                                     children: [
 
+                                      /// 👥 USUARIOS
                                       _HoverCard(
                                         icon: Icons.people,
                                         title: "Usuarios",
                                         value: "$totalUsers",
                                         subtitle:
-                                            "Activos: $activeUsers\nBloqueados: $blockedUsers",
+                                            "Activos: $activeUsers (${activePercent.toStringAsFixed(1)}%)\n"
+                                            "Bloqueados: $blockedUsers (${blockedPercent.toStringAsFixed(1)}%)",
                                         color: Colors.blue,
                                         onTap: () {
                                           Navigator.pushNamed(
@@ -217,13 +233,19 @@ class _AdminScreenState extends State<AdminScreen> {
                                         },
                                       ),
 
+                                      /// 📊 ACTIVIDAD
                                       _HoverCard(
                                         icon: Icons.bar_chart,
-                                        title: "A futuro",
-                                        value: "--",
-                                        subtitle: "Próximamente",
+                                        title: "Actividad",
+                                        value:
+                                            "${activePercent.toStringAsFixed(0)}%",
+                                        subtitle:
+                                            "Usuarios activos del total",
                                         color: Colors.orange,
-                                        onTap: () {},
+                                        onTap: () {
+                                          Navigator.pushNamed(
+                                              context, '/activity');
+                                        },
                                       ),
                                     ],
                                   ),
@@ -243,11 +265,13 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  /// DRAWER
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
       child: Column(
         children: [
           const DrawerHeader(child: Text("Menú")),
+
           ListTile(
             leading: const Icon(Icons.people),
             title: const Text("Usuarios"),
@@ -256,6 +280,16 @@ class _AdminScreenState extends State<AdminScreen> {
               Navigator.pushNamed(context, '/users');
             },
           ),
+
+          ListTile(
+            leading: const Icon(Icons.bar_chart),
+            title: const Text("Estadísticas"),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/activity');
+            },
+          ),
+
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text("Cerrar sesión"),
@@ -267,7 +301,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 }
 
-/// 🔥 CARD PRO CON MISMO TAMAÑO + HOVER
+/// 🔥 CARD PRO
 class _HoverCard extends StatefulWidget {
   final IconData icon;
   final String title;
@@ -303,7 +337,7 @@ class _HoverCardState extends State<_HoverCard> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: 300,
-          height: 140, // 🔥 MISMO TAMAÑO
+          height: 140,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -320,7 +354,6 @@ class _HoverCardState extends State<_HoverCard> {
 
           child: Row(
             children: [
-
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -336,7 +369,7 @@ class _HoverCardState extends State<_HoverCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween, // 🔥 CLAVE
+                      MainAxisAlignment.spaceBetween,
                   children: [
                     Text(widget.title,
                         style: const TextStyle(color: Colors.grey)),

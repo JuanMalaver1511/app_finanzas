@@ -40,6 +40,7 @@ dependencies:
   firebase_storage: ^11.7.0  
   image_picker: ^1.1.2  
   cloud_functions: ^4.7.0
+  fl_chart: ^0.66.0
 
 dev_dependencies:
   flutter_test:
