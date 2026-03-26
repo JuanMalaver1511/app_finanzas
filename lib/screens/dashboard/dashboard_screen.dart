@@ -36,7 +36,6 @@ class AppTransaction {
     required this.date,
   });
 
-  // Convierte Firestore → AppTransaction
   factory AppTransaction.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
     return AppTransaction(
@@ -49,7 +48,6 @@ class AppTransaction {
     );
   }
 
-  // Convierte AppTransaction → Firestore
   Map<String, dynamic> toMap() => {
         'title': title,
         'category': category,
@@ -91,7 +89,6 @@ const kCategoryIcons = {
 };
 
 Color _catColor(String cat) => kCategoryColors[cat] ?? const Color(0xFFAAAAAA);
-
 IconData _catIcon(String cat) => kCategoryIcons[cat] ?? Icons.receipt_outlined;
 
 // ─── FIRESTORE SERVICE ─────────────────────────────────────────────────────────
@@ -105,16 +102,12 @@ class _TxService {
       .doc(uid)
       .collection('transactions');
 
-  // Stream en tiempo real
   Stream<List<AppTransaction>> stream() => _col
       .orderBy('date', descending: true)
       .snapshots()
       .map((s) => s.docs.map(AppTransaction.fromDoc).toList());
 
-  // Agregar
   Future<void> add(AppTransaction tx) => _col.add(tx.toMap());
-
-  // Eliminar
   Future<void> delete(String id) => _col.doc(id).delete();
 }
 
@@ -144,7 +137,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _logout() async {
     await FirebaseAuth.instance.signOut();
-
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AuthWrapper()),
@@ -164,12 +156,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       backgroundColor: kBg,
+      // ✅ FAB en móvil para agregar transacción
+      floatingActionButton: isMobile
+          ? FloatingActionButton(
+              onPressed: _showAddDialog,
+              backgroundColor: kAmber,
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
       body: StreamBuilder<List<AppTransaction>>(
         stream: _txService.stream(),
         builder: (context, snapshot) {
-          // Cargando primera vez
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
                 child: CircularProgressIndicator(color: kAmber));
@@ -190,7 +191,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _TopBar(
                 onNew: _showAddDialog,
                 onProfile: () => Navigator.push(
-                  // ← REEMPLAZA el print
                   context,
                   MaterialPageRoute(builder: (_) => const ProfileScreen()),
                 ),
@@ -198,38 +198,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
+                  padding: EdgeInsets.all(isMobile ? 14 : 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Banner bienvenida
                       _WelcomeBanner(name: _userName),
-                      const SizedBox(height: 20),
-                      // Cards de balance
+                      const SizedBox(height: 16),
                       _BalanceCards(
                           balance: balance, income: income, expense: expense),
-                      const SizedBox(height: 20),
-                      // Gráficos (solo si hay gastos)
+                      const SizedBox(height: 16),
                       if (transactions.isNotEmpty) ...[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                                child: _DonutCard(transactions: transactions)),
-                            const SizedBox(width: 16),
-                            Expanded(
-                                child: _BudgetBarsCard(
-                                    transactions: transactions)),
-                          ],
+                        // ✅ Gráficos en columna en móvil, fila en desktop
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            if (constraints.maxWidth < 600) {
+                              return Column(
+                                children: [
+                                  _DonutCard(transactions: transactions),
+                                  const SizedBox(height: 16),
+                                  _BudgetBarsCard(transactions: transactions),
+                                ],
+                              );
+                            }
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                    child:
+                                        _DonutCard(transactions: transactions)),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                    child: _BudgetBarsCard(
+                                        transactions: transactions)),
+                              ],
+                            );
+                          },
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                       ],
-                      // Transacciones
                       _TransactionsCard(
                         transactions: transactions,
                         onDelete: (id) => _txService.delete(id),
                       ),
-                      const SizedBox(height: 20),
+                      // ✅ Espacio extra en móvil para el FAB
+                      SizedBox(height: isMobile ? 80 : 20),
                     ],
                   ),
                 ),
@@ -246,63 +258,68 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _TopBar extends StatelessWidget {
   final VoidCallback onNew;
-  final VoidCallback onProfile; // ← NUEVO
+  final VoidCallback onProfile;
   final Future<void> Function() onLogout;
 
   const _TopBar({
     required this.onNew,
-    required this.onProfile, // ← NUEVO
+    required this.onProfile,
     required this.onLogout,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Container(
       color: Colors.white,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 8,
-        left: 20,
-        right: 16,
+        left: 16,
+        right: 8,
         bottom: 12,
       ),
       child: Column(
         children: [
           Row(
             children: [
+              // Logo
               Container(
-                width: 36,
-                height: 36,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: kAmber.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.account_balance_wallet,
-                    color: kAmber, size: 20),
+                    color: kAmber, size: 18),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               const Text('KyboApp',
                   style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold, color: kDark)),
+                      fontSize: 17, fontWeight: FontWeight.bold, color: kDark)),
               const Spacer(),
-              ElevatedButton.icon(
-                onPressed: onNew,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Nueva transacción',
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kAmber,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22)),
-                ),
-              ),
-              const SizedBox(width: 4),
 
-              // ─── BOTÓN PERFIL ───────────────────────────────────────────────
+              // ✅ En desktop: botón con texto. En móvil: solo icono
+              if (!isMobile)
+                ElevatedButton.icon(
+                  onPressed: onNew,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Nueva transacción',
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kAmber,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22)),
+                  ),
+                ),
+
+              // Perfil
               IconButton(
                 onPressed: onProfile,
                 tooltip: 'Mi perfil',
@@ -319,12 +336,12 @@ class _TopBar extends StatelessWidget {
                       color: Color(0xFF3B5BDB), size: 18),
                 ),
               ),
-              // ───────────────────────────────────────────────────────────────
 
+              // Logout
               IconButton(
                 onPressed: () async => await onLogout(),
                 tooltip: 'Cerrar sesión',
-                icon: const Icon(Icons.logout_rounded, color: kGrey),
+                icon: const Icon(Icons.logout_rounded, color: kGrey, size: 20),
               ),
             ],
           ),
@@ -364,20 +381,22 @@ class _WelcomeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 20,
+        vertical: isMobile ? 16 : 20,
+      ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: const LinearGradient(
-          colors: [
-            Colors.white,
-            Color(0xFFFFF4DC), // ámbar muy suave
-          ],
+          colors: [Colors.white, Color(0xFFFFF4DC)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        border: Border.all(color: Color(0xFFFFE0A0), width: 1.2),
+        border: Border.all(color: const Color(0xFFFFE0A0), width: 1.2),
         boxShadow: [
           BoxShadow(
             color: kAmber.withOpacity(0.15),
@@ -388,10 +407,10 @@ class _WelcomeBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Avatar con iniciales
+          // Avatar
           Container(
-            width: 52,
-            height: 52,
+            width: isMobile ? 44 : 52,
+            height: isMobile ? 44 : 52,
             decoration: BoxDecoration(
               color: kAmber.withOpacity(0.18),
               borderRadius: BorderRadius.circular(14),
@@ -400,14 +419,14 @@ class _WelcomeBanner extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               _initials,
-              style: const TextStyle(
-                fontSize: 20,
+              style: TextStyle(
+                fontSize: isMobile ? 16 : 20,
                 fontWeight: FontWeight.bold,
                 color: kAmber,
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
 
           // Textos
           Expanded(
@@ -416,23 +435,24 @@ class _WelcomeBanner extends StatelessWidget {
               children: [
                 Text(
                   '$_greeting,',
-                  style: const TextStyle(
-                    fontSize: 13,
+                  style: TextStyle(
+                    fontSize: isMobile ? 12 : 13,
                     color: kGrey,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 2),
                 Text(
                   name,
-                  style: const TextStyle(
-                    fontSize: 20,
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 20,
                     fontWeight: FontWeight.bold,
                     color: kDark,
                     letterSpacing: 0.2,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Row(
                   children: [
                     Container(
@@ -446,10 +466,7 @@ class _WelcomeBanner extends StatelessWidget {
                     const SizedBox(width: 5),
                     const Text(
                       'Finanzas al día',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: kGrey,
-                      ),
+                      style: TextStyle(fontSize: 11, color: kGrey),
                     ),
                   ],
                 ),
@@ -457,20 +474,18 @@ class _WelcomeBanner extends StatelessWidget {
             ),
           ),
 
-          // Icono decorativo
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: kAmber.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kAmber.withOpacity(0.3), width: 1),
+          // Icono decorativo — oculto en móvil para ahorrar espacio
+          if (!isMobile)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: kAmber.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kAmber.withOpacity(0.3), width: 1),
+              ),
+              child:
+                  const Icon(Icons.bar_chart_rounded, color: kAmber, size: 26),
             ),
-            child: const Icon(
-              Icons.bar_chart_rounded,
-              color: kAmber,
-              size: 26,
-            ),
-          ),
         ],
       ),
     );
@@ -486,31 +501,80 @@ class _BalanceCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    if (isMobile) {
+      // ✅ En móvil: balance arriba, ingresos y gastos abajo lado a lado
+      return Column(
+        children: [
+          _StatCard(
+            label: 'Balance total',
+            value: 'COP ${balance.toStringAsFixed(2)}',
+            icon: Icons.account_balance_wallet_outlined,
+            iconColor: kAmber,
+            valueColor: kDark,
+            fullWidth: true,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  label: 'Ingresos',
+                  value: 'COP ${income.toStringAsFixed(2)}',
+                  icon: Icons.trending_up_rounded,
+                  iconColor: kGreen,
+                  valueColor: kGreen,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _StatCard(
+                  label: 'Gastos',
+                  value: 'COP ${expense.toStringAsFixed(2)}',
+                  icon: Icons.trending_down_rounded,
+                  iconColor: kRed,
+                  valueColor: kRed,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    // Desktop: las 3 en fila
     return Row(
       children: [
         Expanded(
-            child: _StatCard(
-                label: 'Balance total',
-                value: 'COP ${balance.toStringAsFixed(2)}',
-                icon: Icons.account_balance_wallet_outlined,
-                iconColor: kAmber,
-                valueColor: kDark)),
+          child: _StatCard(
+            label: 'Balance total',
+            value: 'COP ${balance.toStringAsFixed(2)}',
+            icon: Icons.account_balance_wallet_outlined,
+            iconColor: kAmber,
+            valueColor: kDark,
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(
-            child: _StatCard(
-                label: 'Ingresos',
-                value: 'COP ${income.toStringAsFixed(2)}',
-                icon: Icons.trending_up_rounded,
-                iconColor: kGreen,
-                valueColor: kGreen)),
+          child: _StatCard(
+            label: 'Ingresos',
+            value: 'COP ${income.toStringAsFixed(2)}',
+            icon: Icons.trending_up_rounded,
+            iconColor: kGreen,
+            valueColor: kGreen,
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(
-            child: _StatCard(
-                label: 'Gastos',
-                value: 'COP ${expense.toStringAsFixed(2)}',
-                icon: Icons.trending_down_rounded,
-                iconColor: kRed,
-                valueColor: kRed)),
+          child: _StatCard(
+            label: 'Gastos',
+            value: 'COP ${expense.toStringAsFixed(2)}',
+            icon: Icons.trending_down_rounded,
+            iconColor: kRed,
+            valueColor: kRed,
+          ),
+        ),
       ],
     );
   }
@@ -520,18 +584,22 @@ class _StatCard extends StatelessWidget {
   final String label, value;
   final IconData icon;
   final Color iconColor, valueColor;
+  final bool fullWidth;
 
-  const _StatCard(
-      {required this.label,
-      required this.value,
-      required this.icon,
-      required this.iconColor,
-      required this.valueColor});
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.iconColor,
+    required this.valueColor,
+    this.fullWidth = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: fullWidth ? double.infinity : null,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: kCard,
         borderRadius: BorderRadius.circular(16),
@@ -548,7 +616,10 @@ class _StatCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: kGrey)),
+              Flexible(
+                child: Text(label,
+                    style: const TextStyle(fontSize: 12, color: kGrey)),
+              ),
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
@@ -561,9 +632,8 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(value,
               style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: valueColor)),
+                  fontSize: 13, fontWeight: FontWeight.bold, color: valueColor),
+              overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -578,7 +648,6 @@ class _DonutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Agrupar gastos por categoría
     final Map<String, double> totals = {};
     for (final tx in transactions.where((t) => !t.isIncome)) {
       totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
@@ -684,7 +753,6 @@ class _BudgetBarsCard extends StatelessWidget {
   final List<AppTransaction> transactions;
   const _BudgetBarsCard({required this.transactions});
 
-  // Presupuestos fijos de referencia
   static const Map<String, double> _budgets = {
     'Alimentación': 300,
     'Transporte': 150,
@@ -742,7 +810,7 @@ class _BudgetBarsCard extends StatelessWidget {
                                 color: kDark)),
                       ]),
                       Text(
-                          'COP ${spent.toStringAsFixed(0)} / COP ${budget.toStringAsFixed(0)}',
+                          'COP ${spent.toStringAsFixed(0)} / ${budget.toStringAsFixed(0)}',
                           style: const TextStyle(fontSize: 10, color: kGrey)),
                     ],
                   ),
@@ -777,7 +845,7 @@ class _TransactionsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -797,7 +865,7 @@ class _TransactionsCard extends StatelessWidget {
                     Text('Sin transacciones aún',
                         style: TextStyle(color: kGrey, fontSize: 14)),
                     SizedBox(height: 4),
-                    Text('Presiona "+ Nueva transacción" para comenzar',
+                    Text('Presiona + para comenzar',
                         style: TextStyle(color: kGrey, fontSize: 12)),
                   ],
                 ),
@@ -827,20 +895,21 @@ class _TxRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _catColor(tx.category);
     final icon = _catIcon(tx.category);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,21 +918,27 @@ class _TxRow extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: kDark)),
+                        color: kDark),
+                    overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
-                Text('${tx.category} · ${_formatDate(tx.date)}',
-                    style: const TextStyle(fontSize: 11, color: kGrey)),
+                Text(
+                  isMobile
+                      ? tx.category
+                      : '${tx.category} · ${_formatDate(tx.date)}',
+                  style: const TextStyle(fontSize: 11, color: kGrey),
+                ),
               ],
             ),
           ),
+          const SizedBox(width: 6),
           Text(
-            '${tx.isIncome ? '+' : '-'} COP ${tx.amount.toStringAsFixed(2)}',
+            '${tx.isIncome ? '+' : '-'} COP ${tx.amount.toStringAsFixed(0)}',
             style: TextStyle(
-                fontSize: 13,
+                fontSize: isMobile ? 12 : 13,
                 fontWeight: FontWeight.bold,
                 color: tx.isIncome ? kGreen : kRed),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           GestureDetector(
             onTap: () => _confirmDelete(context),
             child: const Icon(Icons.delete_outline, size: 18, color: kGrey),
@@ -930,11 +1005,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
     'Servicios',
     'Otros',
   ];
-  final List<String> _incomeCategories = [
-    'Ingreso',
-    'Trabajo',
-    'Otros',
-  ];
+  final List<String> _incomeCategories = ['Ingreso', 'Trabajo', 'Otros'];
 
   List<String> get _categories =>
       _isIncome ? _incomeCategories : _expenseCategories;
@@ -999,17 +1070,23 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return Dialog(
+      // ✅ En móvil ocupa casi toda la pantalla
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 40,
+        vertical: isMobile ? 20 : 40,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       backgroundColor: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Título + cerrar
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1026,7 +1103,7 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
               ),
               const SizedBox(height: 20),
 
-              // Toggle Gasto / Ingreso (igual al screenshot)
+              // Toggle Gasto / Ingreso
               Row(
                 children: [
                   Expanded(
@@ -1080,20 +1157,15 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // Descripción
               const Text('Descripción',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
               const SizedBox(height: 8),
-              _Field(
-                controller: _titleCtrl,
-                hint: 'Ej: Compra de comida',
-              ),
-              const SizedBox(height: 16),
+              _Field(controller: _titleCtrl, hint: 'Ej: Compra de comida'),
+              const SizedBox(height: 14),
 
-              // Monto
               const Text('Monto',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
@@ -1104,9 +1176,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Categoría dropdown
               const Text('Categoría',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
@@ -1149,9 +1220,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Fecha
               const Text('Fecha',
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
@@ -1176,9 +1246,8 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Botón Agregar (verde como en el screenshot)
               SizedBox(
                 width: double.infinity,
                 height: 50,
