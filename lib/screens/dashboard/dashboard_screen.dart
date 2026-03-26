@@ -8,7 +8,7 @@ import '../profile/profile_screen.dart';
 import '../movements/movements_screen.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
-
+const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
 const kAmber = Color(0xFFFFBB4E);
 const kBg = Color(0xFFF0F2F5);
 const kCard = Colors.white;
@@ -362,7 +362,7 @@ class _TopBar extends StatelessWidget {
                       color: Color(0xFF3B5BDB), size: 18),
                 ),
               ),
-              //Movimientos
+// Movimientos (mismo estilo que perfil)
               IconButton(
                 onPressed: () {
                   Navigator.push(
@@ -373,7 +373,23 @@ class _TopBar extends StatelessWidget {
                   );
                 },
                 tooltip: 'Mis movimientos',
-                icon: const Icon(Icons.list_rounded, color: kGrey, size: 20),
+                icon: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFBFC8F5),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.bar_chart_rounded, // 👈 gráfico
+                    color: Color(0xFF3B5BDB),
+                    size: 18,
+                  ),
+                ),
               ),
 
               // Logout
