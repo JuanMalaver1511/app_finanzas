@@ -56,12 +56,12 @@ class _LoginScreenState extends State<LoginScreen> {
             color: Colors.white,
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
+                constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    /// IMAGEN
+                    /// IMAGEN más pequeña
                     TweenAnimationBuilder<double>(
                       duration: const Duration(milliseconds: 700),
                       tween: Tween(begin: 0.9, end: 1),
@@ -74,40 +74,40 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                       child: Image.asset(
                         "assets/images/login.png",
-                        width: 360,
+                        width: 280,
                       ),
                     ),
 
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 28),
 
                     /// TITULO
                     const Text(
                       "Toma el control de tu dinero",
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 36,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
                         height: 1.2,
                         letterSpacing: -0.5,
                       ),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
 
                     /// SUBTITULO
                     const Text(
                       "Organiza, ahorra y haz crecer tus finanzas con Kybo.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         color: Colors.black54,
                         height: 1.5,
                       ),
                     ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 22),
 
-                    /// LINEA DECORATIVA (detalle pro)
+                    /// LINEA DECORATIVA
                     Container(
                       width: 60,
                       height: 4,
@@ -141,24 +141,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: SlideTransition(position: slide, child: child),
                   );
                 },
-                child: SingleChildScrollView(
-                  child: Container(
-                    key: ValueKey(currentView),
-                    width: 420,
-                    padding: const EdgeInsets.all(40),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 25,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: currentForm(),
+                child: Container(
+                  key: ValueKey(currentView),
+                  width: 380,
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 25,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
+                  child: currentForm(),
                 ),
               ),
             ),
@@ -177,8 +175,8 @@ class _LoginScreenState extends State<LoginScreen> {
         duration: const Duration(milliseconds: 400),
         child: Container(
           key: ValueKey(currentView),
-          width: 350,
-          padding: const EdgeInsets.all(30),
+          width: 320,
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),

@@ -79,7 +79,7 @@ class _LoginFormState extends State<LoginForm> {
           filled: true,
           fillColor: Colors.white,
           contentPadding:
-              const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+              const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
@@ -308,7 +308,6 @@ class _LoginFormState extends State<LoginForm> {
       if (user != null) {
         final userData = await _firestore.getUser(user.uid);
 
-        // Cuenta bloqueada
         if (userData != null && userData.isActive == false) {
           await FirebaseAuth.instance.signOut();
           if (!mounted) return;
@@ -321,7 +320,6 @@ class _LoginFormState extends State<LoginForm> {
           return;
         }
 
-        // ✅ Si no existe en Firestore, crearlo
         if (userData == null) {
           await _firestore.createUser(AppUser(
             uid: user.uid,
@@ -334,11 +332,9 @@ class _LoginFormState extends State<LoginForm> {
         } else {
           await _firestore.updateUserLoginData(user.uid);
         }
-        // ✅ No navegues — AuthWrapper detecta el cambio y redirige solo
       }
     } catch (e) {
       if (!mounted) return;
-      // ✅ Ignorar error de COOP, no mostrar "Error con Google"
       final errStr = e.toString().toLowerCase();
       if (!errStr.contains('cross-origin') &&
           !errStr.contains('coop') &&
@@ -360,47 +356,41 @@ class _LoginFormState extends State<LoginForm> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset("assets/images/logo.png", width: 70),
-              const SizedBox(height: 20),
+              Image.asset("assets/images/logo.png", width: 55),
+              const SizedBox(height: 12),
               const Text(
                 "Iniciar Sesión",
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
               _input(
                 controller: emailController,
                 hint: "Correo electrónico",
                 icon: Icons.email_outlined,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _input(
                 controller: passwordController,
                 hint: "Contraseña",
                 icon: Icons.lock_outline,
                 isPassword: true,
               ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _showResetDialog,
-                  child: const Text("¿Olvidaste tu contraseña?"),
-                ),
-              ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 4),
+
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 48,
                 child: ElevatedButton(
                   onPressed: isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
@@ -431,31 +421,61 @@ class _LoginFormState extends State<LoginForm> {
                         ),
                 ),
               ),
+              // ✅ "¿Olvidaste tu contraseña?" centrado y en negro
+              Center(
+                child: TextButton(
+                  onPressed: _showResetDialog,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.black,
+                  ),
+                  child: const Text(
+                    "¿Olvidaste tu contraseña?",
+                    style: TextStyle(color: Colors.black),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
               const Divider(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
+
+              // ✅ "Continuar con Google" en negro
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 48,
                 child: OutlinedButton.icon(
                   icon: Image.asset("assets/images/google.png", width: 22),
-                  label: const Text("Continuar con Google"),
+                  label: const Text(
+                    "Continuar con Google",
+                    style: TextStyle(color: Colors.black),
+                  ),
                   onPressed: isLoading ? null : _googleLogin,
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
+
+              // ✅ "Crear cuenta" en negro
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text("¿No tienes cuenta?"),
                   TextButton(
                     onPressed: widget.onRegister,
-                    child: const Text("Crear cuenta"),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text(
+                      "Crear cuenta",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   )
                 ],
               ),

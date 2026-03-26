@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../auth/auth_wrapper.dart';
 import '../profile/profile_screen.dart';
+import '../movements/movements_screen.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 
@@ -291,13 +292,38 @@ class _TopBar extends StatelessWidget {
                   color: kAmber.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.account_balance_wallet,
-                    color: kAmber, size: 18),
+                child: const Icon(
+                  Icons.account_balance_wallet,
+                  color: kAmber,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 8),
-              const Text('KyboApp',
-                  style: TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.bold, color: kDark)),
+
+// 👇 AQUÍ EL CAMBIO
+              Text.rich(
+                const TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Kybo',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: kDark, // negro o tu color oscuro
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'App',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: kAmber, // mismo color del icono 🔥
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               const Spacer(),
 
               // ✅ En desktop: botón con texto. En móvil: solo icono
@@ -335,6 +361,19 @@ class _TopBar extends StatelessWidget {
                   child: const Icon(Icons.person_outline_rounded,
                       color: Color(0xFF3B5BDB), size: 18),
                 ),
+              ),
+              //Movimientos
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MovementsScreen(),
+                    ),
+                  );
+                },
+                tooltip: 'Mis movimientos',
+                icon: const Icon(Icons.list_rounded, color: kGrey, size: 20),
               ),
 
               // Logout
@@ -1163,7 +1202,9 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
               const SizedBox(height: 8),
-              _Field(controller: _titleCtrl, hint: 'Ej: Compra de comida'),
+              _Field(
+                  controller: _titleCtrl,
+                  hint: 'Ej: Compra de comida o Venta freelance'),
               const SizedBox(height: 14),
 
               const Text('Monto',
