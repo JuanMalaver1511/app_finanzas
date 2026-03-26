@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart'; // 🔥 IMPOR
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+//import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -19,7 +19,7 @@ import 'screens/admin/security_screen.dart';
 import 'screens/profile/profile_screen.dart';
 
 Future<void> main() async {
-  await dotenv.load(fileName: ".env");
+  //await dotenv.load(fileName: ".env");
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
