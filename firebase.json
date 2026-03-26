@@ -1,39 +1,16 @@
 {
-  "flutter": {
-    "platforms": {
-      "android": {
-        "default": {
-          "projectId": "control-financiero-app-b9f91",
-          "appId": "1:381507930224:android:4c3fd14decdcb6164c4cb5",
-          "fileOutput": "android/app/google-services.json"
-        }
-      },
-      "dart": {
-        "lib/firebase_options.dart": {
-          "projectId": "control-financiero-app-b9f91",
-          "configurations": {
-            "android": "1:381507930224:android:4c3fd14decdcb6164c4cb5",
-            "ios": "1:381507930224:ios:6b92b76966bacd6b4c4cb5",
-            "macos": "1:381507930224:ios:6b92b76966bacd6b4c4cb5",
-            "web": "1:381507930224:web:106dbcff6eed84d04c4cb5",
-            "windows": "1:381507930224:web:54e1b40c98da04954c4cb5"
-          }
-        }
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
       }
-    }
-  },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "disallowLegacyRuntimeConfig": true,
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "*.local"
-      ]
-    }
-  ]
+    ]
+  }
 }
