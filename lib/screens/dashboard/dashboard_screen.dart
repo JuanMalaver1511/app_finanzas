@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
-import '../login/login_screen.dart';
+import '../auth/auth_wrapper.dart';
 import '../profile/profile_screen.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
@@ -143,11 +143,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _logout() async {
-    //await _auth.signOut();
+    await FirebaseAuth.instance.signOut();
+
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthWrapper()),
+      (route) => false,
     );
   }
 

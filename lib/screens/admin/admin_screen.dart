@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../widgets/admin/sidebar_icon.dart';
+import '../auth/auth_wrapper.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -87,17 +88,17 @@ class _AdminScreenState extends State<AdminScreen> {
       },
     );
 
-    // Si cancela → no hace nada
     if (confirm != true) return;
 
-    // Cierra sesión
     await FirebaseAuth.instance.signOut();
 
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      '/login',
-      (route) => false,
-    );
+    // ✅ Vuelve al AuthWrapper limpiando todo el stack
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthWrapper()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -313,7 +314,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 }
 
-/// CARD 
+/// CARD
 class _HoverCard extends StatefulWidget {
   final IconData icon;
   final String title;

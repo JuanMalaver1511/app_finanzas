@@ -5,6 +5,7 @@ import '../../services/firestore_service.dart';
 import '../../widgets/common/custom_alert.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../admin/admin_screen.dart';
+import '../../models/user_model.dart';
 
 class LoginForm extends StatefulWidget {
   final VoidCallback onRegister;
@@ -296,9 +297,6 @@ class _LoginFormState extends State<LoginForm> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  /// ==============================
-  /// GOOGLE LOGIN
-  /// ==============================
   Future<void> _googleLogin() async {
     setState(() => isLoading = true);
 
@@ -310,44 +308,47 @@ class _LoginFormState extends State<LoginForm> {
       if (user != null) {
         final userData = await _firestore.getUser(user.uid);
 
+        // Cuenta bloqueada
         if (userData != null && userData.isActive == false) {
           await FirebaseAuth.instance.signOut();
-
+          if (!mounted) return;
           showCustomAlert(
             context,
             message: "Tu cuenta está bloqueada",
             type: AlertType.error,
           );
-
+          if (mounted) setState(() => isLoading = false);
           return;
         }
 
-        await _firestore.updateUserLoginData(user.uid);
-
-        final role = userData?.role ?? 'user';
-
-        if (role == 'admin') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const AdminScreen(),
-            ),
-          );
+        // ✅ Si no existe en Firestore, crearlo
+        if (userData == null) {
+          await _firestore.createUser(AppUser(
+            uid: user.uid,
+            name: user.displayName ?? 'Usuario',
+            email: user.email ?? '',
+            role: 'user',
+            isActive: true,
+            createdAt: DateTime.now(),
+          ));
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const DashboardScreen(),
-            ),
-          );
+          await _firestore.updateUserLoginData(user.uid);
         }
+        // ✅ No navegues — AuthWrapper detecta el cambio y redirige solo
       }
-    } catch (_) {
-      showCustomAlert(
-        context,
-        message: "Error con Google",
-        type: AlertType.error,
-      );
+    } catch (e) {
+      if (!mounted) return;
+      // ✅ Ignorar error de COOP, no mostrar "Error con Google"
+      final errStr = e.toString().toLowerCase();
+      if (!errStr.contains('cross-origin') &&
+          !errStr.contains('coop') &&
+          !errStr.contains('window.close')) {
+        showCustomAlert(
+          context,
+          message: "Error con Google",
+          type: AlertType.error,
+        );
+      }
     }
 
     if (mounted) setState(() => isLoading = false);
@@ -388,9 +389,7 @@ class _LoginFormState extends State<LoginForm> {
                 icon: Icons.lock_outline,
                 isPassword: true,
               ),
-
               const SizedBox(height: 8),
-              
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(

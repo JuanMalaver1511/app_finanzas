@@ -6,7 +6,7 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   /// ==============================
-  /// USUARIO ACTUAL 
+  /// USUARIO ACTUAL
   /// ==============================
   User? get currentUser => _auth.currentUser;
 
@@ -46,39 +46,36 @@ class AuthService {
     }
   }
 
-  /// ==============================
-  /// LOGIN CON GOOGLE (WEB + MÓVIL)
-  /// ==============================
   Future<User?> loginWithGoogle() async {
     try {
       if (kIsWeb) {
         final googleProvider = GoogleAuthProvider();
-
-        final userCredential =
-            await _auth.signInWithPopup(googleProvider);
-
+        final userCredential = await _auth.signInWithPopup(googleProvider);
         return userCredential.user;
       } else {
-        final GoogleSignInAccount? googleUser =
-            await GoogleSignIn().signIn();
-
+        final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
         if (googleUser == null) return null;
 
         final googleAuth = await googleUser.authentication;
-
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
 
-        final userCredential =
-            await _auth.signInWithCredential(credential);
-
+        final userCredential = await _auth.signInWithCredential(credential);
         return userCredential.user;
       }
     } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user') return null;
       throw Exception(_mapError(e.code));
-    } catch (_) {
+    } catch (e) {
+      // Ignorar error de COOP que no impide el login
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('cross-origin') ||
+          errStr.contains('window.close') ||
+          errStr.contains('coop')) {
+        return _auth.currentUser; // El usuario YA está logueado
+      }
       throw Exception("Error con Google");
     }
   }

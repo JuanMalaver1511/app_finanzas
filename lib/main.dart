@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart'; // 🔥 IMPOR
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -18,6 +19,7 @@ import 'screens/admin/security_screen.dart';
 import 'screens/profile/profile_screen.dart';
 
 Future<void> main() async {
+  await dotenv.load(fileName: ".env");
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
@@ -66,7 +68,6 @@ class MyApp extends StatelessWidget {
 
           return const LoginScreen();
         },
-
         '/admin': (context) {
           final user = FirebaseAuth.instance.currentUser;
 
@@ -76,25 +77,21 @@ class MyApp extends StatelessWidget {
 
           return const AdminScreen();
         },
-
         '/users': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
           return const UsersScreen();
         },
-
         '/activity': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
           return const ActivityScreen();
         },
-
         '/security': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
           return const SecurityScreen();
         },
-
         '/profile': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
