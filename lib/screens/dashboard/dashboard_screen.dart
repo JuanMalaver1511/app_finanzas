@@ -793,15 +793,15 @@ class _BudgetBarsCard extends StatelessWidget {
   const _BudgetBarsCard({required this.transactions});
 
   static const Map<String, double> _budgets = {
-    'Alimentación': 300,
-    'Transporte': 150,
-    'Entretenimiento': 100,
-    'Salud': 200,
-    'Educación': 100,
-    'Hogar': 1000,
-    'Ropa': 100,
-    'Servicios': 200,
-    'Otros': 100,
+    'Alimentación': 600000, // mercado básico mensual
+    'Transporte': 200000, // bus, gasolina, etc
+    'Entretenimiento': 150000,
+    'Salud': 250000,
+    'Educación': 300000,
+    'Hogar': 1500000, // arriendo + gastos
+    'Ropa': 150000,
+    'Servicios': 300000, // agua, luz, internet
+    'Otros': 150000,
   };
 
   @override
