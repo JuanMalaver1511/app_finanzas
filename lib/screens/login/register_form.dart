@@ -59,14 +59,10 @@ class _RegisterFormState extends State<RegisterForm> {
             fontSize: 14,
           ),
           prefixIcon: Icon(icon, color: Colors.black54),
-
-          // 👁️ VER CONTRASEÑA
           suffixIcon: isPassword
               ? IconButton(
                   icon: Icon(
-                    _obscurePassword
-                        ? Icons.visibility_off
-                        : Icons.visibility,
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     color: Colors.black54,
                   ),
                   onPressed: () {
@@ -76,22 +72,18 @@ class _RegisterFormState extends State<RegisterForm> {
                   },
                 )
               : null,
-
           filled: true,
           fillColor: Colors.white,
           contentPadding:
-              const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-
+              const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
-
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: BorderSide.none,
           ),
-
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
             borderSide: const BorderSide(
@@ -237,26 +229,26 @@ class _RegisterFormState extends State<RegisterForm> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Image.asset("assets/images/logo.png", width: 70),
-              const SizedBox(height: 20),
+              Image.asset("assets/images/logo.png", width: 55),
+              const SizedBox(height: 12),
 
               const Text(
                 "Crear cuenta",
                 style: TextStyle(
-                  fontSize: 28,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.5,
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
 
               _input(
                 controller: nameController,
@@ -264,7 +256,7 @@ class _RegisterFormState extends State<RegisterForm> {
                 icon: Icons.person_outline,
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               _input(
                 controller: emailController,
@@ -272,7 +264,7 @@ class _RegisterFormState extends State<RegisterForm> {
                 icon: Icons.email_outlined,
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               _input(
                 controller: passwordController,
@@ -281,14 +273,12 @@ class _RegisterFormState extends State<RegisterForm> {
                 isPassword: true,
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 18),
 
-              const SizedBox(height: 25),
-
-              /// 🔥 BOTÓN PRO
+              /// 🔥 BOTÓN REGISTRARSE
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 48,
                 child: ElevatedButton(
                   onPressed: isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
@@ -320,18 +310,23 @@ class _RegisterFormState extends State<RegisterForm> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
               const Divider(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
 
+              // ✅ "Registrarse con Google" en negro
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 48,
                 child: OutlinedButton.icon(
                   icon: Image.asset("assets/images/google.png", width: 22),
-                  label: const Text("Registrarse con Google"),
+                  label: const Text(
+                    "Registrarse con Google",
+                    style: TextStyle(color: Colors.black),
+                  ),
                   onPressed: isLoading ? null : _googleRegister,
                   style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -339,15 +334,25 @@ class _RegisterFormState extends State<RegisterForm> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
 
+              // ✅ "Iniciar sesión" en negro
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text("¿Ya tienes cuenta?"),
                   TextButton(
                     onPressed: widget.onLogin,
-                    child: const Text("Iniciar sesión"),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text(
+                      "Iniciar sesión",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   )
                 ],
               ),

@@ -5,9 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/auth_service.dart';
 import '../auth/auth_wrapper.dart';
 import '../profile/profile_screen.dart';
+import '../movements/movements_screen.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
-
+const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
 const kAmber = Color(0xFFFFBB4E);
 const kBg = Color(0xFFF0F2F5);
 const kCard = Colors.white;
@@ -291,13 +292,38 @@ class _TopBar extends StatelessWidget {
                   color: kAmber.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.account_balance_wallet,
-                    color: kAmber, size: 18),
+                child: const Icon(
+                  Icons.account_balance_wallet,
+                  color: kAmber,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 8),
-              const Text('KyboApp',
-                  style: TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.bold, color: kDark)),
+
+// 👇 AQUÍ EL CAMBIO
+              Text.rich(
+                const TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Kybo',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: kDark, // negro o tu color oscuro
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'App',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: kAmber, // mismo color del icono 🔥
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               const Spacer(),
 
               // ✅ En desktop: botón con texto. En móvil: solo icono
@@ -334,6 +360,35 @@ class _TopBar extends StatelessWidget {
                   ),
                   child: const Icon(Icons.person_outline_rounded,
                       color: Color(0xFF3B5BDB), size: 18),
+                ),
+              ),
+// Movimientos (mismo estilo que perfil)
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MovementsScreen(),
+                    ),
+                  );
+                },
+                tooltip: 'Mis movimientos',
+                icon: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: const Color(0xFFBFC8F5),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.bar_chart_rounded, // 👈 gráfico
+                    color: Color(0xFF3B5BDB),
+                    size: 18,
+                  ),
                 ),
               ),
 
@@ -754,15 +809,15 @@ class _BudgetBarsCard extends StatelessWidget {
   const _BudgetBarsCard({required this.transactions});
 
   static const Map<String, double> _budgets = {
-    'Alimentación': 300,
-    'Transporte': 150,
-    'Entretenimiento': 100,
-    'Salud': 200,
-    'Educación': 100,
-    'Hogar': 1000,
-    'Ropa': 100,
-    'Servicios': 200,
-    'Otros': 100,
+    'Alimentación': 600000, // mercado básico mensual
+    'Transporte': 200000, // bus, gasolina, etc
+    'Entretenimiento': 150000,
+    'Salud': 250000,
+    'Educación': 300000,
+    'Hogar': 1500000, // arriendo + gastos
+    'Ropa': 150000,
+    'Servicios': 300000, // agua, luz, internet
+    'Otros': 150000,
   };
 
   @override
@@ -1163,7 +1218,9 @@ class _AddTransactionDialogState extends State<_AddTransactionDialog> {
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
               const SizedBox(height: 8),
-              _Field(controller: _titleCtrl, hint: 'Ej: Compra de comida'),
+              _Field(
+                  controller: _titleCtrl,
+                  hint: 'Ej: Compra de comida o Venta freelance'),
               const SizedBox(height: 14),
 
               const Text('Monto',
