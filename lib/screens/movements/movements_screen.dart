@@ -178,7 +178,6 @@ class _MovementsScreenState extends State<MovementsScreen>
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
       child: Scaffold(
@@ -189,73 +188,200 @@ class _MovementsScreenState extends State<MovementsScreen>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isMobile = constraints.maxWidth < 600;
+                final isTablet =
+                    constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
+                final isDesktop = constraints.maxWidth >= 1024;
 
                 double maxWidth;
-                if (constraints.maxWidth < 600) {
+                if (isMobile) {
                   maxWidth = constraints.maxWidth;
-                } else if (constraints.maxWidth < 1200) {
+                } else if (isTablet) {
                   maxWidth = 900;
                 } else {
-                  maxWidth = 1200; // 🔥 más ancho en desktop
+                  maxWidth = 1200;
                 }
 
                 return Center(
                   child: SizedBox(
                     width: maxWidth,
-                    child: CustomScrollView(
-                      slivers: [
-                        _buildAppBar(isMobile),
-                        SliverPadding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal:
-                                isMobile ? 16 : 32, // 👈 más aire en desktop
-                            vertical: 8,
-                          ),
-                          sliver: SliverList(
-                            delegate: SliverChildListDelegate([
-                              _buildMonthSelector(),
-                              const SizedBox(height: 16),
-                              StreamBuilder<List<AppTransaction>>(
-                                stream: _monthStream,
-                                builder: (_, snap) {
-                                  final list = snap.data ?? [];
-                                  final income = list
-                                      .where((t) => t.isIncome)
-                                      .fold(0.0, (a, b) => a + b.amount);
-                                  final expense = list
-                                      .where((t) => !t.isIncome)
-                                      .fold(0.0, (a, b) => a + b.amount);
-
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildSummaryCards(
-                                          income, expense, isMobile),
-                                      const SizedBox(height: 20),
-                                      _buildChartSection(),
-                                      const SizedBox(height: 20),
-                                      _buildCategoryFilter(),
-                                      const SizedBox(height: 16),
-                                      _buildTransactionList(
-                                          list, snap.connectionState),
-                                      const SizedBox(height: 90),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ]),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: isDesktop
+                        ? _buildDesktopLayout(maxWidth)
+                        : _buildMobileLayout(isMobile),
                   ),
                 );
               },
             ),
           ),
         ),
-        //floatingActionButton: _buildFab(),
+      ),
+    );
+  }
+
+  // Layout móvil/tablet — igual que antes
+  Widget _buildMobileLayout(bool isMobile) {
+    return CustomScrollView(
+      slivers: [
+        _buildAppBar(isMobile),
+        SliverPadding(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 32,
+            vertical: 8,
+          ),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              _buildMonthSelector(),
+              const SizedBox(height: 16),
+              StreamBuilder<List<AppTransaction>>(
+                stream: _monthStream,
+                builder: (_, snap) {
+                  final list = snap.data ?? [];
+                  final income = list
+                      .where((t) => t.isIncome)
+                      .fold(0.0, (a, b) => a + b.amount);
+                  final expense = list
+                      .where((t) => !t.isIncome)
+                      .fold(0.0, (a, b) => a + b.amount);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSummaryCards(income, expense, isMobile),
+                      const SizedBox(height: 20),
+                      _buildChartSection(),
+                      const SizedBox(height: 20),
+                      _buildCategoryFilter(),
+                      const SizedBox(height: 16),
+                      _buildTransactionList(list, snap.connectionState),
+                      const SizedBox(height: 90),
+                    ],
+                  );
+                },
+              ),
+            ]),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Layout desktop — dos columnas, sin scroll outer
+  Widget _buildDesktopLayout(double maxWidth) {
+    return Column(
+      children: [
+        // ── AppBar fijo ──
+        _buildDesktopHeader(),
+        // ── Contenido en dos columnas ──
+        Expanded(
+          child: StreamBuilder<List<AppTransaction>>(
+            stream: _monthStream,
+            builder: (_, snap) {
+              final list = snap.data ?? [];
+              final income = list
+                  .where((t) => t.isIncome)
+                  .fold(0.0, (a, b) => a + b.amount);
+              final expense = list
+                  .where((t) => !t.isIncome)
+                  .fold(0.0, (a, b) => a + b.amount);
+
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(32, 8, 32, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Columna izquierda (resumen + gráfica) ──
+                    Expanded(
+                      flex: 5,
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            _buildMonthSelector(),
+                            const SizedBox(height: 16),
+                            _buildSummaryCards(income, expense, false),
+                            const SizedBox(height: 20),
+                            _buildChartSection(),
+                            const SizedBox(height: 90),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    // ── Columna derecha (filtros + lista) ──
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        children: [
+                          _buildCategoryFilter(),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  _buildTransactionList(
+                                      list, snap.connectionState),
+                                  const SizedBox(height: 90),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopHeader() {
+    return Container(
+      color: kBg,
+      padding: const EdgeInsets.fromLTRB(32, 16, 32, 12),
+      child: Row(
+        children: [
+          // Flecha atrás con más espacio y separación clara
+          GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: kCard,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: kDark.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: kDark, size: 18),
+            ),
+          ),
+          const SizedBox(width: 16), // 👈 espacio entre flecha y barra amarilla
+          Container(
+            width: 7,
+            height: 22,
+            decoration: BoxDecoration(
+              color: kAmber,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Text(
+            'Mis Movimientos',
+            style: TextStyle(
+              color: kDark,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -266,29 +392,48 @@ class _MovementsScreenState extends State<MovementsScreen>
       backgroundColor: kBg,
       elevation: 0,
       pinned: true,
-      expandedHeight: isMobile ? 80 : 90,
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: EdgeInsets.fromLTRB(
-          isMobile ? 16 : 32, // 👈 MÁS espacio a la izquierda
-          0,
-          16,
-          16,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: GestureDetector(
+          onTap: () => Navigator.of(context).maybePop(),
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: kCard,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: kDark.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: kDark, size: 16),
+          ),
         ),
-        title: Row(children: [
-          Container(
-              width: 7,
-              height: 22,
-              decoration: BoxDecoration(
-                  color: kAmber, borderRadius: BorderRadius.circular(4))),
-          const SizedBox(width: 10),
-          const Text('Mis Movimientos',
-              style: TextStyle(
-                  color: kDark,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 21,
-                  letterSpacing: -0.5)),
-        ]),
       ),
+      title: Row(children: [
+        Container(
+          width: 7,
+          height: 22,
+          decoration: BoxDecoration(
+            color: kAmber,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Text(
+          'Mis Movimientos',
+          style: TextStyle(
+            color: kDark,
+            fontWeight: FontWeight.w800,
+            fontSize: 21,
+            letterSpacing: -0.5,
+          ),
+        ),
+      ]),
       systemOverlayStyle: SystemUiOverlayStyle.dark,
     );
   }

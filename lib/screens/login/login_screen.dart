@@ -61,26 +61,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    /// IMAGEN más pequeña
                     TweenAnimationBuilder<double>(
                       duration: const Duration(milliseconds: 700),
                       tween: Tween(begin: 0.9, end: 1),
                       curve: Curves.easeOut,
                       builder: (context, value, child) {
-                        return Transform.scale(
-                          scale: value,
-                          child: child,
-                        );
+                        return Transform.scale(scale: value, child: child);
                       },
-                      child: Image.asset(
-                        "assets/images/login.png",
-                        width: 280,
-                      ),
+                      child: Image.asset("assets/images/login.png", width: 280),
                     ),
-
                     const SizedBox(height: 28),
-
-                    /// TITULO
                     const Text(
                       "Toma el control de tu dinero",
                       textAlign: TextAlign.center,
@@ -91,10 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         letterSpacing: -0.5,
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
-                    /// SUBTITULO
                     const Text(
                       "Organiza, ahorra y haz crecer tus finanzas con Kybo.",
                       textAlign: TextAlign.center,
@@ -104,15 +91,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 1.5,
                       ),
                     ),
-
                     const SizedBox(height: 22),
-
-                    /// LINEA DECORATIVA
                     Container(
                       width: 60,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Color(0xFFFFB84E),
+                        color: const Color(0xFFFFB84E),
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -123,40 +107,45 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
 
-        /// DERECHA (FORMULARIO)
+        /// DERECHA (FORMULARIO) — 👇 fix aquí
         Expanded(
           child: Container(
             color: const Color(0xFFF8F9FA),
             child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                transitionBuilder: (child, animation) {
-                  final slide = Tween<Offset>(
-                    begin: const Offset(0.2, 0),
-                    end: Offset.zero,
-                  ).animate(animation);
-
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(position: slide, child: child),
-                  );
-                },
-                child: Container(
-                  key: ValueKey(currentView),
-                  width: 380,
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 25,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
+              // centra vertical y horizontal
+              child: SingleChildScrollView(
+                // scroll si la pantalla es muy baja
+                padding: const EdgeInsets.symmetric(vertical: 32),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  transitionBuilder: (child, animation) {
+                    final slide = Tween<Offset>(
+                      begin: const Offset(0.2, 0),
+                      end: Offset.zero,
+                    ).animate(animation);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(position: slide, child: child),
+                    );
+                  },
+                  child: Container(
+                    key: ValueKey(currentView),
+                    width: 380,
+                    // ✅ SIN height fijo — el contenido decide el alto
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 25,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: currentForm(),
                   ),
-                  child: currentForm(),
                 ),
               ),
             ),
@@ -171,24 +160,28 @@ class _LoginScreenState extends State<LoginScreen> {
   /// ==============================
   Widget _mobileLayout() {
     return Center(
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        child: Container(
-          key: ValueKey(currentView),
-          width: 320,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              )
-            ],
+      child: SingleChildScrollView(
+        // 👈 scroll en móvil también
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: Container(
+            key: ValueKey(currentView),
+            width: 320,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: currentForm(),
           ),
-          child: currentForm(),
         ),
       ),
     );
