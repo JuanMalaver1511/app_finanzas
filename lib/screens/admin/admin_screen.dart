@@ -50,7 +50,6 @@ class _AdminScreenState extends State<AdminScreen> {
       activeUsers = active;
       blockedUsers = blocked;
 
-      /// CALCULAR PORCENTAJES
       activePercent = total == 0 ? 0 : (active / total) * 100;
       blockedPercent = total == 0 ? 0 : (blocked / total) * 100;
 
@@ -63,9 +62,6 @@ class _AdminScreenState extends State<AdminScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
           title: const Text("Cerrar sesión"),
           content: const Text("¿Estás seguro de que deseas cerrar sesión?"),
           actions: [
@@ -75,13 +71,7 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFB84E),
-              ),
-              child: const Text(
-                "Cerrar sesión",
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text("Cerrar sesión"),
             ),
           ],
         );
@@ -92,7 +82,6 @@ class _AdminScreenState extends State<AdminScreen> {
 
     await FirebaseAuth.instance.signOut();
 
-    // ✅ Vuelve al AuthWrapper limpiando todo el stack
     if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const AuthWrapper()),
@@ -126,29 +115,22 @@ class _AdminScreenState extends State<AdminScreen> {
                     children: [
                       const SizedBox(height: 20),
                       const Icon(Icons.admin_panel_settings,
-                          color: Colors.white, size: 30),
+                          color: Colors.white),
                       const SizedBox(height: 30),
                       SidebarIcon(icon: Icons.dashboard, onTap: () {}),
                       SidebarIcon(
                         icon: Icons.people,
-                        onTap: () {
-                          Navigator.pushNamed(context, '/users');
-                        },
+                        onTap: () => Navigator.pushNamed(context, '/users'),
                       ),
                       SidebarIcon(
                         icon: Icons.bar_chart,
-                        onTap: () {
-                          Navigator.pushNamed(context, '/activity');
-                        },
+                        onTap: () => Navigator.pushNamed(context, '/activity'),
                       ),
                     ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SidebarIcon(
-                      icon: Icons.logout,
-                      onTap: () => _logout(context),
-                    ),
+                  SidebarIcon(
+                    icon: Icons.logout,
+                    onTap: () => _logout(context),
                   )
                 ],
               ),
@@ -162,64 +144,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Column(
                   children: [
                     /// HEADER
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              if (isMobile)
-                                Builder(
-                                  builder: (context) => IconButton(
-                                    icon: const Icon(Icons.menu),
-                                    onPressed: () {
-                                      Scaffold.of(context).openDrawer();
-                                    },
-                                  ),
-                                ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "Panel Administrativo",
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                  Text(
-                                    userName,
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              const Icon(Icons.notifications_none),
-                              const SizedBox(width: 12),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.pushNamed(context, '/profile');
-                                },
-                                child: MouseRegion(
-                                  cursor: SystemMouseCursors.click,
-                                  child: CircleAvatar(
-                                    backgroundColor: Colors.orange.shade200,
-                                    child: Text(
-                                      userName[0].toUpperCase(),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
+                    _buildAdminHeader(userName, isMobile),
 
                     /// BODY
                     Expanded(
@@ -236,7 +161,6 @@ class _AdminScreenState extends State<AdminScreen> {
                                     spacing: 20,
                                     runSpacing: 20,
                                     children: [
-                                      /// USUARIOS
                                       _HoverCard(
                                         icon: Icons.people,
                                         title: "Usuarios",
@@ -250,8 +174,6 @@ class _AdminScreenState extends State<AdminScreen> {
                                               context, '/users');
                                         },
                                       ),
-
-                                      /// ACTIVIDAD
                                       _HoverCard(
                                         icon: Icons.bar_chart,
                                         title: "Actividad",
@@ -262,6 +184,17 @@ class _AdminScreenState extends State<AdminScreen> {
                                         onTap: () {
                                           Navigator.pushNamed(
                                               context, '/activity');
+                                        },
+                                      ),
+                                      _HoverCard(
+                                        icon: Icons.notifications,
+                                        title: "Notificaciones",
+                                        value: "PENDIENTE",
+                                        subtitle: "Pendientes por enviar",
+                                        color: Colors.purple,
+                                        onTap: () {
+                                          Navigator.pushNamed(
+                                              context, '/notifications');
                                         },
                                       ),
                                     ],
@@ -281,6 +214,66 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
+  /// HEADER
+  Widget _buildAdminHeader(String userName, bool isMobile) {
+    final hour = DateTime.now().hour;
+
+    String saludo;
+    if (hour < 12) {
+      saludo = "Buenos días";
+    } else if (hour < 18) {
+      saludo = "Buenas tardes";
+    } else {
+      saludo = "Buenas noches";
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2B2257),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            if (isMobile)
+              Builder(
+                builder: (context) => IconButton(
+                  icon: const Icon(Icons.menu, color: Colors.white),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
+            const SizedBox(width: 10),
+            const Icon(Icons.admin_panel_settings, color: Colors.white),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("$saludo,",
+                      style: const TextStyle(color: Colors.white70)),
+                  Text(userName,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Text(
+                userName[0].toUpperCase(),
+                style: const TextStyle(color: Color(0xFF2B2257)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
   /// DRAWER
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
@@ -290,18 +283,12 @@ class _AdminScreenState extends State<AdminScreen> {
           ListTile(
             leading: const Icon(Icons.people),
             title: const Text("Usuarios"),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushNamed(context, '/users');
-            },
+            onTap: () => Navigator.pushNamed(context, '/users'),
           ),
           ListTile(
             leading: const Icon(Icons.bar_chart),
             title: const Text("Estadísticas"),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.pushNamed(context, '/activity');
-            },
+            onTap: () => Navigator.pushNamed(context, '/activity'),
           ),
           ListTile(
             leading: const Icon(Icons.logout),
@@ -344,7 +331,6 @@ class _HoverCardState extends State<_HoverCard> {
     return MouseRegion(
       onEnter: (_) => setState(() => isHover = true),
       onExit: (_) => setState(() => isHover = false),
-      cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
@@ -362,7 +348,6 @@ class _HoverCardState extends State<_HoverCard> {
               )
             ],
           ),
-          transform: Matrix4.identity()..scale(isHover ? 1.03 : 1.0),
           child: Row(
             children: [
               Container(
