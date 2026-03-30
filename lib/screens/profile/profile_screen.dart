@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
 
-// ─── COLORES (mismos del dashboard) ───────────────────────────────────────────
 const kAmber = Color(0xFFFFBB4E);
 const kBg = Color(0xFFF0F2F5);
 const kCard = Colors.white;
@@ -15,7 +14,8 @@ const kRed = Color(0xFFE74C3C);
 const kGreenBtn = Color(0xFF27AE60);
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final VoidCallback? onBack; // ✅ declarado
+  const ProfileScreen({super.key, this.onBack}); // ✅ pasado al constructor
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -39,11 +39,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    // Primero cargamos desde FirebaseAuth
     _nameCtrl.text = user.displayName ?? user.email?.split('@').first ?? '';
     _photoUrl = user.photoURL;
 
-    // Luego sincronizamos con Firestore (puede tener datos más actualizados)
     final doc = await _firestore.collection('users').doc(user.uid).get();
     if (doc.exists && mounted) {
       final data = doc.data()!;
@@ -54,37 +52,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ─── FOTO ────────────────────────────────────────────────────────────────────
-
   Future<void> _pickAndUploadPhoto() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-      );
-
+      final result = await FilePicker.platform.pickFiles(type: FileType.image);
       if (result == null) return;
-
       final bytes = result.files.first.bytes;
-
       if (bytes == null) return;
-
       setState(() => _uploadingPhoto = true);
-
       final ref = _storage.ref().child('users/${user.uid}/avatar.jpg');
-
       await ref.putData(bytes);
-
       final url = await ref.getDownloadURL();
-
       await user.updatePhotoURL(url);
-
       await _firestore.collection('users').doc(user.uid).set(
         {'photoUrl': url},
         SetOptions(merge: true),
       );
-
       if (mounted) setState(() => _photoUrl = url);
-
       _showSnack('Foto actualizada ✓', kGreen);
     } catch (e) {
       _showSnack('Error al subir foto: $e', kRed);
@@ -123,7 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Handle
               Container(
                 width: 40,
                 height: 4,
@@ -174,8 +156,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // ─── NOMBRE ──────────────────────────────────────────────────────────────────
-
   Future<void> _saveName() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
@@ -197,8 +177,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) setState(() => _savingName = false);
     }
   }
-
-  // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
   void _showSnack(String msg, Color color) {
     if (!mounted) return;
@@ -225,8 +203,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
-  // ─── BUILD ───────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -238,7 +214,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: kDark, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (widget.onBack != null) {
+              // ✅ widget.onBack
+              widget.onBack!();
+            } else if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+          },
         ),
         title: const Text(
           'Mi perfil',
@@ -264,7 +247,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // ─── AVATAR ──────────────────────────────────────────────────────
             _AvatarSection(
               photoUrl: _photoUrl,
               initials: _initials,
@@ -272,12 +254,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onTap: _showPhotoOptions,
             ),
             const SizedBox(height: 28),
-
-            // ─── SECCIÓN: INFORMACIÓN ─────────────────────────────────────
             _SectionLabel(label: 'Información personal'),
             const SizedBox(height: 10),
-
-            // Nombre
             _InfoCard(
               icon: Icons.person_outline_rounded,
               iconColor: kAmber,
@@ -386,8 +364,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
             ),
             const SizedBox(height: 10),
-
-            // Email (solo lectura)
             _InfoCard(
               icon: Icons.email_outlined,
               iconColor: const Color(0xFF3B82F6),
@@ -421,8 +397,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 10),
-
-            // UID (solo lectura, útil para soporte)
             _InfoCard(
               icon: Icons.fingerprint_rounded,
               iconColor: kGrey,
@@ -435,11 +409,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 28),
-
-            // ─── SECCIÓN: CUENTA ──────────────────────────────────────────
             _SectionLabel(label: 'Cuenta'),
             const SizedBox(height: 10),
-
             _InfoCard(
               icon: Icons.calendar_today_outlined,
               iconColor: kGrey,
@@ -450,7 +421,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 10),
-
             _InfoCard(
               icon: Icons.access_time_rounded,
               iconColor: kGrey,
@@ -497,7 +467,6 @@ class _AvatarSection extends StatelessWidget {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Anillo exterior
               Container(
                 width: 100,
                 height: 100,
@@ -506,7 +475,6 @@ class _AvatarSection extends StatelessWidget {
                   border: Border.all(color: kAmber, width: 2.5),
                 ),
               ),
-              // Avatar
               ClipOval(
                 child: SizedBox(
                   width: 92,
@@ -529,7 +497,6 @@ class _AvatarSection extends StatelessWidget {
                           : _AvatarFallback(initials: initials),
                 ),
               ),
-              // Botón cámara
               if (!uploading)
                 Positioned(
                   bottom: 0,

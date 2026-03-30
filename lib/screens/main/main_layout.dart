@@ -15,17 +15,17 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _index = 0;
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const MovementsScreen(),
-    const Center(child: Text("Metas próximamente")),
-    const Center(child: Text("Deudas próximamente")),
-    const ProfileScreen(),
-  ];
-
   void _onChange(int i) {
     setState(() => _index = i);
   }
+
+  List<Widget> get _screens => [
+        const DashboardScreen(),
+        const MovementsScreen(),
+        const Center(child: Text("Metas próximamente")),
+        const Center(child: Text("Deudas próximamente")),
+        ProfileScreen(onBack: () => _onChange(0)),
+      ];
 
   @override
   Widget build(BuildContext context) {

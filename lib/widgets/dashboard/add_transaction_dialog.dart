@@ -10,20 +10,25 @@ const kRed = Color(0xFFE74C3C);
 
 class AddTransactionDialog extends StatefulWidget {
   final Future<void> Function(AppTransaction) onAdd;
-  const AddTransactionDialog({required this.onAdd});
+  final AppTransaction? initial; // ✅ si viene, es edición
+
+  const AddTransactionDialog({
+    required this.onAdd,
+    this.initial, // ✅
+  });
 
   @override
   State<AddTransactionDialog> createState() => _AddTransactionDialogState();
 }
 
 class _AddTransactionDialogState extends State<AddTransactionDialog> {
-  bool _isIncome = false;
+  late bool _isIncome;
   bool _loading = false;
-  String? _selectedCategory;
-  DateTime _selectedDate = DateTime.now();
+  late String? _selectedCategory;
+  late DateTime _selectedDate;
 
-  final _titleCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _amountCtrl;
 
   final List<String> _expenseCategories = [
     'Alimentación',
@@ -40,6 +45,22 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
   List<String> get _categories =>
       _isIncome ? _incomeCategories : _expenseCategories;
+
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final tx = widget.initial;
+    // Si hay transacción inicial, pre-llenamos los campos
+    _isIncome = tx?.isIncome ?? false;
+    _selectedCategory = tx?.category;
+    _selectedDate = tx?.date ?? DateTime.now();
+    _titleCtrl = TextEditingController(text: tx?.title ?? '');
+    _amountCtrl = TextEditingController(
+      text: tx != null ? tx.amount.toStringAsFixed(0) : '',
+    );
+  }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -75,7 +96,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     setState(() => _loading = true);
     try {
       await widget.onAdd(AppTransaction(
-        id: '',
+        id: widget.initial?.id ?? '', // ✅ conserva el id si es edición
         title: _titleCtrl.text.trim(),
         category: _selectedCategory!,
         amount: amount,
@@ -100,11 +121,17 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Dialog(
-      // ✅ En móvil ocupa casi toda la pantalla
       insetPadding: EdgeInsets.symmetric(
         horizontal: isMobile ? 12 : 40,
         vertical: isMobile ? 20 : 40,
@@ -121,11 +148,13 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Agregar transacción',
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: kDark)),
+                  Text(
+                    _isEditing ? 'Editar transacción' : 'Agregar transacción',
+                    style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: kDark),
+                  ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: const Icon(Icons.close, color: kGrey),
@@ -194,9 +223,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                   style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
               const SizedBox(height: 8),
-              _Field(
-                  controller: _titleCtrl,
-                  hint: 'Ej: Compra de comida o Venta freelance'),
+              _Field(controller: _titleCtrl, hint: 'Ej: Compra de comida'),
               const SizedBox(height: 14),
 
               const Text('Monto',
@@ -299,9 +326,11 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                           height: 20,
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Agregar',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold)),
+                      : Text(
+                          _isEditing ? 'Guardar cambios' : 'Agregar',
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
             ],
@@ -311,8 +340,6 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     );
   }
 }
-
-// ─── INPUT REUTILIZABLE ─────────────────────────────
 
 class _Field extends StatelessWidget {
   final TextEditingController controller;
