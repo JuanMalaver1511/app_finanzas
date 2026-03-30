@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../models/transaction_model.dart';
 
 // ─── COLORES (mismos que el dashboard) ───────────────────────────────────────
 const kAmber = Color(0xFFFFBB4E);
@@ -15,45 +16,6 @@ const kGreenBtn = Color(0xFF27AE60);
 const kRed = Color(0xFFE74C3C);
 const kAmberLight = Color(0xFFFFF3DC);
 
-// ─── MODELO — idéntico al AppTransaction del dashboard ───────────────────────
-class AppTransaction {
-  final String id;
-  final String title;
-  final String category;
-  final double amount;
-  final DateTime date;
-  final bool isIncome;
-
-  AppTransaction({
-    required this.id,
-    required this.title,
-    required this.category,
-    required this.amount,
-    required this.date,
-    required this.isIncome,
-  });
-
-  factory AppTransaction.fromFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    return AppTransaction(
-      id: doc.id,
-      title: d['title'] ?? '',
-      category: d['category'] ?? '',
-      amount: (d['amount'] ?? 0).toDouble(),
-      date: (d['date'] as Timestamp).toDate(),
-      isIncome: d['isIncome'] ?? false,
-    );
-  }
-
-  Map<String, dynamic> toFirestore() => {
-        'title': title,
-        'category': category,
-        'amount': amount,
-        'date': Timestamp.fromDate(date),
-        'isIncome': isIncome,
-      };
-}
-
 // ─── DATOS MENSUALES PARA GRÁFICA ────────────────────────────────────────────
 class _MonthlyData {
   final String label;
@@ -61,9 +23,6 @@ class _MonthlyData {
   final double expense;
   _MonthlyData(this.label, this.income, this.expense);
 }
-
-// ─── COLECCIÓN FIRESTORE ─────────────────────────────────────────────────────
-const _kCol = 'transactions';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  MOVEMENTS SCREEN
@@ -116,7 +75,7 @@ class _MovementsScreenState extends State<MovementsScreen>
         .where('date', isLessThan: Timestamp.fromDate(end))
         .orderBy('date', descending: true)
         .snapshots()
-        .map((s) => s.docs.map(AppTransaction.fromFirestore).toList());
+        .map((s) => s.docs.map(AppTransaction.fromDoc).toList());
   }
 
   // ── Stream gráfica últimos 6 meses ──
@@ -128,7 +87,7 @@ class _MovementsScreenState extends State<MovementsScreen>
         .orderBy('date')
         .snapshots()
         .map((s) {
-      final txs = s.docs.map(AppTransaction.fromFirestore).toList();
+      final txs = s.docs.map(AppTransaction.fromDoc).toList();
       final map = <String, _MonthlyData>{};
       for (int i = 5; i >= 0; i--) {
         final m = DateTime(now.year, now.month - i);
@@ -833,32 +792,6 @@ class _MovementsScreenState extends State<MovementsScreen>
     );
   }
 
-  // ─── FAB ─────────────────────────────────────────────────────────────────
-  /*
-  Widget _buildFab() {
-    return FloatingActionButton.extended(
-      onPressed: _openAddDialog,
-      backgroundColor: kAmber,
-      foregroundColor: kDark,
-      elevation: 4,
-      icon: const Icon(Icons.add_rounded, size: 22),
-      label:
-          const Text('Agregar', style: TextStyle(fontWeight: FontWeight.w700)),
-    );
-  }
-  */
-
-  // ─── ACCIONES ─────────────────────────────────────────────────────────────
-  /*
-  void _openAddDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => _AddTransactionDialog(
-        onAdd: (t) async => await _col.add(t.toFirestore()),
-      ),
-    );
-  }
-  */
 
   void _showDetail(AppTransaction t) {
     showModalBottomSheet(
@@ -1124,324 +1057,4 @@ class _DetailSheet extends StatelessWidget {
           ],
         ),
       );
-}
-
-// ─── DIALOG AGREGAR — idéntico al del dashboard ───────────────────────────────
-class _AddTransactionDialog extends StatefulWidget {
-  final Future<void> Function(AppTransaction) onAdd;
-  const _AddTransactionDialog({required this.onAdd});
-
-  @override
-  State<_AddTransactionDialog> createState() => _AddTransactionDialogState();
-}
-
-class _AddTransactionDialogState extends State<_AddTransactionDialog> {
-  bool _isIncome = false;
-  bool _loading = false;
-  String? _selectedCategory;
-  DateTime _selectedDate = DateTime.now();
-
-  final _titleCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
-
-  static const _expenseCategories = [
-    'Alimentación',
-    'Transporte',
-    'Entretenimiento',
-    'Salud',
-    'Educación',
-    'Hogar',
-    'Ropa',
-    'Servicios',
-    'Otros',
-  ];
-  static const _incomeCategories = ['Ingreso', 'Trabajo', 'Otros'];
-
-  List<String> get _categories =>
-      _isIncome ? _incomeCategories : _expenseCategories;
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      builder: (ctx, child) => Theme(
-          data: ThemeData.light()
-              .copyWith(colorScheme: const ColorScheme.light(primary: kAmber)),
-          child: child!),
-    );
-    if (picked != null) setState(() => _selectedDate = picked);
-  }
-
-  Future<void> _save() async {
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
-    if (_titleCtrl.text.trim().isEmpty) {
-      _err('Ingresa una descripción');
-      return;
-    }
-    if (amount == null || amount <= 0) {
-      _err('Ingresa un monto válido');
-      return;
-    }
-    if (_selectedCategory == null) {
-      _err('Selecciona una categoría');
-      return;
-    }
-    setState(() => _loading = true);
-    try {
-      await widget.onAdd(AppTransaction(
-        id: '',
-        title: _titleCtrl.text.trim(),
-        category: _selectedCategory!,
-        amount: amount,
-        isIncome: _isIncome,
-        date: _selectedDate,
-      ));
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) _err('Error al guardar: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _err(String msg) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text(msg), backgroundColor: kRed));
-
-  String _fmtDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/'
-      '${d.year}';
-
-  Color _catColor(String cat) {
-    switch (cat.toLowerCase()) {
-      case 'alimentación':
-        return const Color(0xFF27AE60);
-      case 'transporte':
-        return const Color(0xFF2980B9);
-      case 'entretenimiento':
-        return kRed;
-      case 'salud':
-        return const Color(0xFFE67E22);
-      case 'educación':
-        return const Color(0xFF8E44AD);
-      case 'hogar':
-        return const Color(0xFF16A085);
-      case 'ropa':
-        return const Color(0xFFC0392B);
-      case 'servicios':
-        return const Color(0xFF7F8C8D);
-      case 'trabajo':
-        return kGreen;
-      case 'ingreso':
-        return const Color(0xFF1D7E45);
-      default:
-        return kGrey;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-    return Dialog(
-      insetPadding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 12 : 40, vertical: isMobile ? 20 : 40),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Agregar transacción',
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: kDark)),
-                  GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.close, color: kGrey)),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Toggle Gasto / Ingreso
-              Row(children: [
-                Expanded(child: _typeBtn('Gasto', false)),
-                const SizedBox(width: 12),
-                Expanded(child: _typeBtn('Ingreso', true)),
-              ]),
-              const SizedBox(height: 16),
-
-              _label('Descripción'),
-              const SizedBox(height: 8),
-              _Field(
-                  controller: _titleCtrl,
-                  hint: 'Ej: Compra de comida o Venta freelance'),
-              const SizedBox(height: 14),
-
-              _label('Monto'),
-              const SizedBox(height: 8),
-              _Field(
-                  controller: _amountCtrl,
-                  hint: '0.00',
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true)),
-              const SizedBox(height: 14),
-
-              _label('Categoría'),
-              const SizedBox(height: 8),
-              Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(10)),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedCategory,
-                    isExpanded: true,
-                    hint: const Text('Seleccione una categoría',
-                        style: TextStyle(color: kGrey, fontSize: 14)),
-                    icon: const Icon(Icons.keyboard_arrow_down, color: kGrey),
-                    items: _categories
-                        .map((cat) => DropdownMenuItem(
-                              value: cat,
-                              child: Row(children: [
-                                Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                        color: _catColor(cat),
-                                        shape: BoxShape.circle)),
-                                const SizedBox(width: 8),
-                                Text(cat,
-                                    style: const TextStyle(
-                                        fontSize: 14, color: kDark)),
-                              ]),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedCategory = v),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              _label('Fecha'),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _pickDate,
-                child: Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_fmtDate(_selectedDate),
-                          style: const TextStyle(fontSize: 14, color: kDark)),
-                      const Icon(Icons.calendar_today_outlined,
-                          size: 18, color: kGrey),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: kGreenBtn,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Agregar',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _typeBtn(String label, bool value) {
-    final active = _isIncome == value;
-    return GestureDetector(
-      onTap: () => setState(() {
-        _isIncome = value;
-        _selectedCategory = null;
-      }),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 44,
-        decoration: BoxDecoration(
-            color: active ? (value ? kGreen : kRed) : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: active ? (value ? kGreen : kRed) : Colors.grey[300]!)),
-        alignment: Alignment.center,
-        child: Text(label,
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: active ? Colors.white : kGrey)),
-      ),
-    );
-  }
-
-  Widget _label(String text) => Text(text,
-      style: const TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w600, color: kDark));
-}
-
-// ─── HELPER FIELD ─────────────────────────────────────────────────────────────
-class _Field extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final TextInputType? keyboardType;
-  const _Field(
-      {required this.controller, required this.hint, this.keyboardType});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: kGrey, fontSize: 14),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey[300]!)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: kAmber, width: 1.5)),
-      ),
-    );
-  }
 }

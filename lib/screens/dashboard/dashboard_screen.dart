@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/auth_service.dart';
 import '../auth/auth_wrapper.dart';
 import '../profile/profile_screen.dart';
-import '../movements/movements_screen.dart';
+import '../../services/transaction_service.dart';
+import '../../models/transaction_model.dart';
+import '../../widgets/dashboard/top_bar.dart';
+import '../../widgets/dashboard/add_transaction_dialog.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
@@ -17,47 +18,6 @@ const kGrey = Color(0xFF8A8A9A);
 const kGreen = Color.fromARGB(255, 29, 126, 69);
 const kRed = Color(0xFFE74C3C);
 const kGreenBtn = Color(0xFF27AE60);
-
-// ─── MODELO ────────────────────────────────────────────────────────────────────
-
-class AppTransaction {
-  final String id;
-  final String title;
-  final String category;
-  final double amount;
-  final bool isIncome;
-  final DateTime date;
-
-  AppTransaction({
-    required this.id,
-    required this.title,
-    required this.category,
-    required this.amount,
-    required this.isIncome,
-    required this.date,
-  });
-
-  factory AppTransaction.fromDoc(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
-    return AppTransaction(
-      id: doc.id,
-      title: d['title'] ?? '',
-      category: d['category'] ?? 'Otros',
-      amount: (d['amount'] as num).toDouble(),
-      isIncome: d['isIncome'] ?? false,
-      date: (d['date'] as Timestamp).toDate(),
-    );
-  }
-
-  Map<String, dynamic> toMap() => {
-        'title': title,
-        'category': category,
-        'amount': amount,
-        'isIncome': isIncome,
-        'date': Timestamp.fromDate(date),
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-}
 
 // ─── CATEGORÍAS ────────────────────────────────────────────────────────────────
 
@@ -92,26 +52,6 @@ const kCategoryIcons = {
 Color _catColor(String cat) => kCategoryColors[cat] ?? const Color(0xFFAAAAAA);
 IconData _catIcon(String cat) => kCategoryIcons[cat] ?? Icons.receipt_outlined;
 
-// ─── FIRESTORE SERVICE ─────────────────────────────────────────────────────────
-
-class _TxService {
-  final String uid;
-  _TxService(this.uid);
-
-  CollectionReference get _col => FirebaseFirestore.instance
-      .collection('users')
-      .doc(uid)
-      .collection('transactions');
-
-  Stream<List<AppTransaction>> stream() => _col
-      .orderBy('date', descending: true)
-      .snapshots()
-      .map((s) => s.docs.map(AppTransaction.fromDoc).toList());
-
-  Future<void> add(AppTransaction tx) => _col.add(tx.toMap());
-  Future<void> delete(String id) => _col.doc(id).delete();
-}
-
 // ─── DASHBOARD SCREEN ──────────────────────────────────────────────────────────
 
 class DashboardScreen extends StatefulWidget {
@@ -122,8 +62,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final AuthService _auth = AuthService();
-  late final _TxService _txService;
+  late final TransactionService _txService;
   late final String _uid;
   late final String _userName;
 
@@ -133,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final user = FirebaseAuth.instance.currentUser!;
     _uid = user.uid;
     _userName = user.displayName ?? user.email?.split('@').first ?? 'Usuario';
-    _txService = _TxService(_uid);
+    _txService = TransactionService(_uid);
   }
 
   Future<void> _logout() async {
@@ -149,7 +88,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showDialog(
       context: context,
       barrierColor: Colors.black45,
-      builder: (_) => _AddTransactionDialog(
+      builder: (_) => AddTransactionDialog(
         onAdd: (tx) => _txService.add(tx),
       ),
     );
@@ -187,229 +126,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
               .fold(0.0, (s, t) => s + t.amount);
           final balance = income - expense;
 
-          return Column(
-            children: [
-              _TopBar(
-                onNew: _showAddDialog,
-                onProfile: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+          return SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                TopBar(
+                  onNew: _showAddDialog,
+                  onProfile: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                  ),
+                  onLogout: _logout,
                 ),
-                onLogout: _logout,
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.all(isMobile ? 14 : 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _WelcomeBanner(name: _userName),
-                      const SizedBox(height: 16),
-                      _BalanceCards(
-                          balance: balance, income: income, expense: expense),
-                      const SizedBox(height: 16),
-                      if (transactions.isNotEmpty) ...[
-                        // ✅ Gráficos en columna en móvil, fila en desktop
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            if (constraints.maxWidth < 600) {
-                              return Column(
-                                children: [
-                                  _DonutCard(transactions: transactions),
-                                  const SizedBox(height: 16),
-                                  _BudgetBarsCard(transactions: transactions),
-                                ],
-                              );
-                            }
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                    child:
-                                        _DonutCard(transactions: transactions)),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                    child: _BudgetBarsCard(
-                                        transactions: transactions)),
-                              ],
-                            );
-                          },
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.all(isMobile ? 14 : 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _WelcomeBanner(name: _userName),
+                        const SizedBox(height: 16),
+                        _BalanceCards(
+                          balance: balance,
+                          income: income,
+                          expense: expense,
                         ),
                         const SizedBox(height: 16),
+
+                        if (transactions.isNotEmpty) ...[
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              if (constraints.maxWidth < 600) {
+                                return Column(
+                                  children: [
+                                    _DonutCard(transactions: transactions),
+                                    const SizedBox(height: 16),
+                                    _BudgetBarsCard(transactions: transactions),
+                                  ],
+                                );
+                              }
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child:
+                                        _DonutCard(transactions: transactions),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _BudgetBarsCard(
+                                        transactions: transactions),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        _TransactionsCard(
+                          transactions: transactions,
+                          onDelete: (id) => _txService.delete(id),
+                        ),
+
+                        // Espacio extra en móvil para el FAB
+                        if (isMobile) const SizedBox(height: 80),
                       ],
-                      _TransactionsCard(
-                        transactions: transactions,
-                        onDelete: (id) => _txService.delete(id),
-                      ),
-                      // ✅ Espacio extra en móvil para el FAB
-                      SizedBox(height: isMobile ? 80 : 20),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
-      ),
-    );
-  }
-}
-
-// ─── TOP BAR ───────────────────────────────────────────────────────────────────
-
-class _TopBar extends StatelessWidget {
-  final VoidCallback onNew;
-  final VoidCallback onProfile;
-  final Future<void> Function() onLogout;
-
-  const _TopBar({
-    required this.onNew,
-    required this.onProfile,
-    required this.onLogout,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 8,
-        left: 16,
-        right: 8,
-        bottom: 12,
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Logo
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: kAmber.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.account_balance_wallet,
-                  color: kAmber,
-                  size: 18,
-                ),
-              ),
-              const SizedBox(width: 8),
-
-// 👇 AQUÍ EL CAMBIO
-              Text.rich(
-                const TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Kybo',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: kDark, // negro o tu color oscuro
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'App',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: kAmber, // mismo color del icono 🔥
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const Spacer(),
-
-              // ✅ En desktop: botón con texto. En móvil: solo icono
-              if (!isMobile)
-                ElevatedButton.icon(
-                  onPressed: onNew,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Nueva transacción',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kAmber,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22)),
-                  ),
-                ),
-
-              // Perfil
-              IconButton(
-                onPressed: onProfile,
-                tooltip: 'Mi perfil',
-                icon: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
-                    borderRadius: BorderRadius.circular(10),
-                    border:
-                        Border.all(color: const Color(0xFFBFC8F5), width: 1.2),
-                  ),
-                  child: const Icon(Icons.person_outline_rounded,
-                      color: Color(0xFF3B5BDB), size: 18),
-                ),
-              ),
-// Movimientos (mismo estilo que perfil)
-              IconButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const MovementsScreen(),
-                    ),
-                  );
-                },
-                tooltip: 'Mis movimientos',
-                icon: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF2FF),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0xFFBFC8F5),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.bar_chart_rounded, // 👈 gráfico
-                    color: Color(0xFF3B5BDB),
-                    size: 18,
-                  ),
-                ),
-              ),
-
-              // Logout
-              IconButton(
-                onPressed: () async => await onLogout(),
-                tooltip: 'Cerrar sesión',
-                icon: const Icon(Icons.logout_rounded, color: kGrey, size: 20),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 2,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [kAmber, kAmber.withOpacity(0.15)],
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1028,350 +817,6 @@ class _TxRow extends StatelessWidget {
 
   String _formatDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-}
-
-// ─── ADD TRANSACTION DIALOG ────────────────────────────────────────────────────
-
-class _AddTransactionDialog extends StatefulWidget {
-  final Future<void> Function(AppTransaction) onAdd;
-  const _AddTransactionDialog({required this.onAdd});
-
-  @override
-  State<_AddTransactionDialog> createState() => _AddTransactionDialogState();
-}
-
-class _AddTransactionDialogState extends State<_AddTransactionDialog> {
-  bool _isIncome = false;
-  bool _loading = false;
-  String? _selectedCategory;
-  DateTime _selectedDate = DateTime.now();
-
-  final _titleCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
-
-  final List<String> _expenseCategories = [
-    'Alimentación',
-    'Transporte',
-    'Entretenimiento',
-    'Salud',
-    'Educación',
-    'Hogar',
-    'Ropa',
-    'Servicios',
-    'Otros',
-  ];
-  final List<String> _incomeCategories = ['Ingreso', 'Trabajo', 'Otros'];
-
-  List<String> get _categories =>
-      _isIncome ? _incomeCategories : _expenseCategories;
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      builder: (ctx, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(primary: kAmber),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => _selectedDate = picked);
-  }
-
-  Future<void> _save() async {
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
-    if (_titleCtrl.text.trim().isEmpty) {
-      _showError('Ingresa una descripción');
-      return;
-    }
-    if (amount == null || amount <= 0) {
-      _showError('Ingresa un monto válido');
-      return;
-    }
-    if (_selectedCategory == null) {
-      _showError('Selecciona una categoría');
-      return;
-    }
-
-    setState(() => _loading = true);
-    try {
-      await widget.onAdd(AppTransaction(
-        id: '',
-        title: _titleCtrl.text.trim(),
-        category: _selectedCategory!,
-        amount: amount,
-        isIncome: _isIncome,
-        date: _selectedDate,
-      ));
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) _showError('Error al guardar: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: kRed),
-    );
-  }
-
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
-    return Dialog(
-      // ✅ En móvil ocupa casi toda la pantalla
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 12 : 40,
-        vertical: isMobile ? 20 : 40,
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Agregar transacción',
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: kDark)),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: kGrey),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Toggle Gasto / Ingreso
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() {
-                        _isIncome = false;
-                        _selectedCategory = null;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: !_isIncome ? kRed : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: !_isIncome ? kRed : Colors.grey[300]!),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('Gasto',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: !_isIncome ? Colors.white : kGrey,
-                            )),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() {
-                        _isIncome = true;
-                        _selectedCategory = null;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: _isIncome ? kGreen : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: _isIncome ? kGreen : Colors.grey[300]!),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('Ingreso',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _isIncome ? Colors.white : kGrey,
-                            )),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              const Text('Descripción',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              _Field(
-                  controller: _titleCtrl,
-                  hint: 'Ej: Compra de comida o Venta freelance'),
-              const SizedBox(height: 14),
-
-              const Text('Monto',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              _Field(
-                controller: _amountCtrl,
-                hint: '0.00',
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 14),
-
-              const Text('Categoría',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedCategory,
-                    isExpanded: true,
-                    hint: const Text('Seleccione una categoría',
-                        style: TextStyle(color: kGrey, fontSize: 14)),
-                    icon: const Icon(Icons.keyboard_arrow_down, color: kGrey),
-                    items: _categories
-                        .map((cat) => DropdownMenuItem(
-                              value: cat,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                        color: _catColor(cat),
-                                        shape: BoxShape.circle),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(cat,
-                                      style: const TextStyle(
-                                          fontSize: 14, color: kDark)),
-                                ],
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedCategory = v),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              const Text('Fecha',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _pickDate,
-                child: Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_formatDate(_selectedDate),
-                          style: const TextStyle(fontSize: 14, color: kDark)),
-                      const Icon(Icons.calendar_today_outlined,
-                          size: 18, color: kGrey),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kGreenBtn,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Agregar',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── FIELD HELPER ──────────────────────────────────────────────────────────────
-
-class _Field extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final TextInputType? keyboardType;
-
-  const _Field(
-      {required this.controller, required this.hint, this.keyboardType});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(fontSize: 14, color: kDark),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: kGrey, fontSize: 14),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: kAmber, width: 1.5),
-        ),
-      ),
-    );
-  }
 }
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────────

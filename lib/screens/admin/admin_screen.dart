@@ -70,6 +70,13 @@ class _AdminScreenState extends State<AdminScreen> {
               child: const Text("Cancelar"),
             ),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFB84E), 
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
               onPressed: () => Navigator.pop(context, true),
               child: const Text("Cerrar sesión"),
             ),
@@ -111,6 +118,7 @@ class _AdminScreenState extends State<AdminScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  /// PARTE SUPERIOR
                   Column(
                     children: [
                       const SizedBox(height: 20),
@@ -128,9 +136,13 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                     ],
                   ),
-                  SidebarIcon(
-                    icon: Icons.logout,
-                    onTap: () => _logout(context),
+
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.white),
+                      onPressed: () => _logout(context),
+                    ),
                   )
                 ],
               ),
@@ -144,7 +156,7 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Column(
                   children: [
                     /// HEADER
-                    _buildAdminHeader(userName, isMobile),
+                    _buildAdminHeader(userName, isMobile, user),
 
                     /// BODY
                     Expanded(
@@ -215,7 +227,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   /// HEADER
-  Widget _buildAdminHeader(String userName, bool isMobile) {
+  Widget _buildAdminHeader(String userName, bool isMobile, User? user) {
     final hour = DateTime.now().hour;
 
     String saludo;
@@ -261,11 +273,29 @@ class _AdminScreenState extends State<AdminScreen> {
                 ],
               ),
             ),
-            CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                userName[0].toUpperCase(),
-                style: const TextStyle(color: Color(0xFF2B2257)),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'perfil') {
+                  Navigator.pushNamed(context, '/profile');
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'perfil',
+                  child: Text('Editar perfil'),
+                ),
+              ],
+              child: CircleAvatar(
+                backgroundColor: Colors.white,
+                backgroundImage: user?.photoURL != null
+                    ? NetworkImage(user!.photoURL!)
+                    : null,
+                child: user?.photoURL == null
+                    ? Text(
+                        userName[0].toUpperCase(),
+                        style: const TextStyle(color: Color(0xFF2B2257)),
+                      )
+                    : null,
               ),
             )
           ],

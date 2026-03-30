@@ -1,9 +1,8 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 // ─── COLORES (mismos del dashboard) ───────────────────────────────────────────
 const kAmber = Color(0xFFFFBB4E);
@@ -26,7 +25,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final user = FirebaseAuth.instance.currentUser!;
   final _firestore = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
-  final _picker = ImagePicker();
 
   final _nameCtrl = TextEditingController();
   bool _editingName = false;
@@ -59,27 +57,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ─── FOTO ────────────────────────────────────────────────────────────────────
 
   Future<void> _pickAndUploadPhoto() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 75,
-      maxWidth: 512,
-    );
-    if (picked == null) return;
-
-    setState(() => _uploadingPhoto = true);
     try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+      );
+
+      if (result == null) return;
+
+      final bytes = result.files.first.bytes;
+
+      if (bytes == null) return;
+
+      setState(() => _uploadingPhoto = true);
+
       final ref = _storage.ref().child('users/${user.uid}/avatar.jpg');
-      await ref.putFile(File(picked.path));
+
+      await ref.putData(bytes);
+
       final url = await ref.getDownloadURL();
 
-      // Actualizar en Auth y Firestore
       await user.updatePhotoURL(url);
+
       await _firestore.collection('users').doc(user.uid).set(
         {'photoUrl': url},
         SetOptions(merge: true),
       );
 
       if (mounted) setState(() => _photoUrl = url);
+
       _showSnack('Foto actualizada ✓', kGreen);
     } catch (e) {
       _showSnack('Error al subir foto: $e', kRed);

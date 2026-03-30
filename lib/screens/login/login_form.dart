@@ -222,6 +222,8 @@ class _LoginFormState extends State<LoginForm> {
         if (userData != null && userData.isActive == false) {
           await FirebaseAuth.instance.signOut();
 
+          if (!mounted) return;
+
           showCustomAlert(
             context,
             message: "Tu cuenta está bloqueada",
@@ -229,7 +231,8 @@ class _LoginFormState extends State<LoginForm> {
           );
 
           setState(() => isLoading = false);
-          return;
+
+          return; 
         }
 
         await _firestore.updateUserLoginData(user.uid);

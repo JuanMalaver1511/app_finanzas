@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; // 🔥 IMPORTANTE
+import 'package:flutter_localizations/flutter_localizations.dart'; 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -40,7 +40,6 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
 
-      // 🔥 SOLUCIÓN AL ERROR
       locale: const Locale('es'),
 
       supportedLocales: const [
