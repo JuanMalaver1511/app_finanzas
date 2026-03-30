@@ -82,7 +82,7 @@ class TopBar extends StatelessWidget {
                   ),
                 ),
 
-              // 🔔 NOTIFICACIONES
+              // NOTIFICACIONES
               IconButton(
                 onPressed: () {},
                 icon: const Icon(Icons.notifications_none, color: kDark),
