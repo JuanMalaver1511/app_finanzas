@@ -168,12 +168,12 @@ class AppSidebar extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: active
                         ? Colors.white
-                        : Colors.white.withValues(alpha: 0.05),
+                        : Colors.white.withOpacity(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: active
                         ? [
                             BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.15),
+                              color: Colors.white.withOpacity(alpha: 0.15),
                               blurRadius: 12,
                             )
                           ]
