@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../main/main_layout.dart';
 
 import '../login/login_screen.dart';
 import '../admin/admin_screen.dart';
@@ -42,12 +43,23 @@ class AuthWrapper extends StatelessWidget {
             }
 
             final data = roleSnapshot.data?.data() as Map<String, dynamic>?;
-            final role = data?['role'] ?? 'user';
+
+            if (data == null || data['isActive'] == false) {
+              Future.microtask(() {
+                FirebaseAuth.instance.signOut();
+              });
+
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            final role = data['role'] ?? 'user';
 
             if (role == 'admin') {
               return const AdminScreen();
             } else {
-              return const DashboardScreen();
+              return const MainLayout();
             }
           },
         );
