@@ -16,10 +16,17 @@ jobs:
       - name: 🐦 Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.22.0'
+          channel: stable
 
       - name: 📦 Dependencies
         run: flutter pub get
+
+      - name: 🧹 Clean
+        run: flutter clean
+
+      - name: 🔍 Doctor
+        run: flutter doctor
 
       - name: 📄 Crear .env
         run: echo "${{ secrets.ENV_FILE }}" > .env
