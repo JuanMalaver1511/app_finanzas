@@ -46,7 +46,7 @@ const kCategoryIcons = {
   'Ropa': Icons.checkroom_outlined,
   'Ingreso': Icons.trending_up,
   'Trabajo': Icons.laptop_mac,
-  'Otros': Icons.more_horiz,
+  'Otross': Icons.more_horiz,
 };
 
 Color _catColor(String cat) => kCategoryColors[cat] ?? const Color(0xFFAAAAAA);
