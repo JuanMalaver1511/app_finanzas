@@ -66,6 +66,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final String _uid;
   late final String _userName;
 
+  void _showEditDialog(AppTransaction tx) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black45,
+      builder: (_) => AddTransactionDialog(
+        initial: tx, // ✅ pre-llena el formulario
+        onAdd: (updated) => _txService.update(updated), // ✅ llama update
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -183,10 +194,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                           const SizedBox(height: 16),
                         ],
-
                         _TransactionsCard(
                           transactions: transactions,
                           onDelete: (id) => _txService.delete(id),
+                          onEdit: _showEditDialog, // ✅ nuevo
                         ),
 
                         // Espacio extra en móvil para el FAB
@@ -683,8 +694,13 @@ class _BudgetBarsCard extends StatelessWidget {
 class _TransactionsCard extends StatelessWidget {
   final List<AppTransaction> transactions;
   final void Function(String id) onDelete;
+  final void Function(AppTransaction tx) onEdit; // ✅
 
-  const _TransactionsCard({required this.transactions, required this.onDelete});
+  const _TransactionsCard({
+    required this.transactions,
+    required this.onDelete,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -718,7 +734,11 @@ class _TransactionsCard extends StatelessWidget {
           else
             ...transactions.asMap().entries.map((e) => Column(
                   children: [
-                    _TxRow(tx: e.value, onDelete: () => onDelete(e.value.id)),
+                    _TxRow(
+                      tx: e.value,
+                      onDelete: () => onDelete(e.value.id),
+                      onEdit: () => onEdit(e.value),
+                    ),
                     if (e.key < transactions.length - 1)
                       Divider(height: 1, color: Colors.grey[100]),
                   ],
@@ -732,8 +752,13 @@ class _TransactionsCard extends StatelessWidget {
 class _TxRow extends StatelessWidget {
   final AppTransaction tx;
   final VoidCallback onDelete;
+  final VoidCallback onEdit; // ✅
 
-  const _TxRow({required this.tx, required this.onDelete});
+  const _TxRow({
+    required this.tx,
+    required this.onDelete,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -783,6 +808,10 @@ class _TxRow extends StatelessWidget {
                 color: tx.isIncome ? kGreen : kRed),
           ),
           const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onEdit,
+            child: const Icon(Icons.edit_outlined, size: 18, color: kGrey),
+          ),
           GestureDetector(
             onTap: () => _confirmDelete(context),
             child: const Icon(Icons.delete_outline, size: 18, color: kGrey),

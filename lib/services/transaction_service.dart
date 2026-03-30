@@ -19,4 +19,6 @@ class TransactionService {
   Future<void> add(AppTransaction tx) => _col.add(tx.toMap());
 
   Future<void> delete(String id) => _col.doc(id).delete();
+
+  Future<void> update(AppTransaction tx) => _col.doc(tx.id).update(tx.toMap());
 }
