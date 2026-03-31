@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math' as math;
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/transaction_model.dart';
+import 'package:intl/intl.dart';
+import '../../widgets/dashboard/add_transaction_dialog.dart';
 
 // ─── COLORES (mismos que el dashboard) ───────────────────────────────────────
 const kAmber = Color(0xFFFFBB4E);
@@ -38,25 +40,10 @@ class _MovementsScreenState extends State<MovementsScreen>
     with TickerProviderStateMixin {
   DateTime _selectedMonth = DateTime.now();
   String? _selectedCategory;
+  List<Map<String, dynamic>> _categories = [];
 
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
-
-  // Categorías — mismas que el dashboard
-  static const _allFilter = [
-    'Todos',
-    'Alimentación',
-    'Transporte',
-    'Entretenimiento',
-    'Salud',
-    'Educación',
-    'Hogar',
-    'Ropa',
-    'Servicios',
-    'Ingreso',
-    'Trabajo',
-    'Otros',
-  ];
 
   CollectionReference get _col {
     final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -115,6 +102,8 @@ class _MovementsScreenState extends State<MovementsScreen>
         vsync: this, duration: const Duration(milliseconds: 400));
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
+
+    _loadCategories();
   }
 
   @override
@@ -134,6 +123,15 @@ class _MovementsScreenState extends State<MovementsScreen>
     });
   }
 
+  Future<void> _loadCategories() async {
+    final snap =
+        await FirebaseFirestore.instance.collection('categories').get();
+
+    setState(() {
+      _categories = snap.docs.map((d) => d.data()).toList();
+    });
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -141,6 +139,29 @@ class _MovementsScreenState extends State<MovementsScreen>
       value: SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: kBg,
+
+        // 🔥 BOTÓN + AGREGADO (AQUÍ ESTÁ LA CLAVE)
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(
+            bottom:1, 
+            right: 1,
+          ),
+          child: FloatingActionButton(
+            onPressed: _openAddTransaction,
+            backgroundColor: kAmber,
+            elevation: 6,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.add,
+              size: 26,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+
         body: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnim,
@@ -302,7 +323,9 @@ class _MovementsScreenState extends State<MovementsScreen>
         children: [
           // Flecha atrás con más espacio y separación clara
           GestureDetector(
-            onTap: () => Navigator.of(context).maybePop(),
+            onTap: () {
+              Navigator.pushNamed(context, '/');
+            },
             child: Container(
               width: 40,
               height: 40,
@@ -354,7 +377,9 @@ class _MovementsScreenState extends State<MovementsScreen>
       leading: Padding(
         padding: const EdgeInsets.only(left: 8),
         child: GestureDetector(
-          onTap: () => Navigator.of(context).maybePop(),
+          onTap: () {
+            Navigator.pushNamed(context, '/');
+          },
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -489,17 +514,62 @@ class _MovementsScreenState extends State<MovementsScreen>
             ),
           ]),
           const SizedBox(height: 8),
-          Text(_formatCOP(balance.abs()),
-              style: TextStyle(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatCOP(balance.abs()),
+                style: TextStyle(
                   color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
-                  fontSize: isMobile ? 28 : 34,
+                  fontSize: isMobile ? 30 : 36,
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -1)),
-          Text(balance >= 0 ? 'Superávit' : 'Déficit',
-              style: TextStyle(
-                  color: (balance >= 0 ? const Color(0xFF56E39F) : kRed)
-                      .withOpacity(0.7),
-                  fontSize: 12)),
+                  letterSpacing: -1,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                balance >= 0
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
+                size: 20,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: (balance >= 0 ? const Color(0xFF56E39F) : kRed)
+                  .withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: (balance >= 0 ? const Color(0xFF56E39F) : kRed)
+                    .withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  balance >= 0
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
+                  color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
+                  size: 14,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  balance >= 0 ? 'Balance positivo' : 'Balance negativo',
+                  style: TextStyle(
+                    color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ]),
       ),
       const SizedBox(height: 12),
@@ -610,42 +680,157 @@ class _MovementsScreenState extends State<MovementsScreen>
 
   // ─── FILTRO CATEGORÍA ─────────────────────────────────────────────────────
   Widget _buildCategoryFilter() {
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _allFilter.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final cat = _allFilter[i];
-          final active = (cat == 'Todos' && _selectedCategory == null) ||
-              cat == _selectedCategory;
-          return GestureDetector(
-            onTap: () =>
-                setState(() => _selectedCategory = cat == 'Todos' ? null : cat),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                  color: active ? kAmber : kCard,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: active
-                      ? [
-                          BoxShadow(
-                              color: kAmber.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3))
-                        ]
-                      : []),
-              child: Text(cat,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                      color: active ? kDark : kGrey)),
+    return Row(
+      children: [
+        // BOTÓN TODOS
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedCategory = null;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: _selectedCategory == null ? kAmber : kCard,
+              borderRadius: BorderRadius.circular(20),
             ),
-          );
-        },
-      ),
+            child: Text(
+              "Todos",
+              style: TextStyle(
+                color: _selectedCategory == null ? kDark : kGrey,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 10),
+
+        // BOTÓN CATEGORÍAS
+        GestureDetector(
+          onTap: () {
+            _showCategoryModal();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: kCard,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  _selectedCategory ?? "Categorías",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: kDark,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCategoryModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            height: 400,
+            child: ListView(
+              children: [
+                const Text(
+                  "Categorías",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  title: const Text("Todos"),
+                  onTap: () {
+                    setState(() {
+                      _selectedCategory = null;
+                    });
+                    Navigator.pop(context);
+                  },
+                ),
+                ..._categories.map((cat) {
+                  return ListTile(
+                    title: Text(cat['name']),
+                    onTap: () {
+                      setState(() {
+                        _selectedCategory = cat['name'];
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                }),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.add),
+                  title: const Text("Nueva categoría"),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAddCategoryDialog();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddCategoryDialog() {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text("Nueva categoría"),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: "Ej: 🍔 Comida",
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancelar"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final text = controller.text.trim();
+
+                if (text.isNotEmpty) {
+                  await FirebaseFirestore.instance
+                      .collection('categories')
+                      .add({
+                    'name': text,
+                    'type': 'expense',
+                  });
+
+                  await _loadCategories();
+                }
+
+                Navigator.pop(context);
+              },
+              child: const Text("Guardar"),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -746,12 +931,19 @@ class _MovementsScreenState extends State<MovementsScreen>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(children: [
             Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(14)),
-                child: Icon(_categoryIcon(t.category), color: color, size: 20)),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text(
+                  t.emoji.isNotEmpty ? t.emoji : '💰',
+                  style: const TextStyle(fontSize: 20),
+                ),
+              ),
+            ),
             const SizedBox(width: 14),
             Expanded(
                 child: Column(
@@ -791,7 +983,6 @@ class _MovementsScreenState extends State<MovementsScreen>
       ),
     );
   }
-
 
   void _showDetail(AppTransaction t) {
     showModalBottomSheet(
@@ -851,11 +1042,26 @@ class _MovementsScreenState extends State<MovementsScreen>
     }
   }
 
+  void _openAddTransaction() {
+    showDialog(
+      context: context,
+      builder: (_) => AddTransactionDialog(
+        onAdd: (tx) async {
+          await _col.add(tx.toMap());
+        },
+      ),
+    );
+  }
+
   // ─── UTILS ────────────────────────────────────────────────────────────────
-  String _formatCOP(double v) {
-    if (v >= 1000000) return 'COP ${(v / 1000000).toStringAsFixed(1)}M';
-    if (v >= 1000) return 'COP ${(v / 1000).toStringAsFixed(0)}K';
-    return 'COP ${v.toStringAsFixed(0)}';
+  String _formatCOP(double value) {
+    final formatter = NumberFormat.currency(
+      locale: 'es_CO',
+      symbol: 'COP ',
+      decimalDigits: 0,
+    );
+
+    return formatter.format(value);
   }
 
   String _dateLabel(DateTime d) {
@@ -1017,13 +1223,19 @@ class _DetailSheet extends StatelessWidget {
                 color: kBg, borderRadius: BorderRadius.circular(2))),
         const SizedBox(height: 24),
         Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20)),
-            child: Icon(t.isIncome ? Icons.south_rounded : Icons.north_rounded,
-                color: color, size: 28)),
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Center(
+            child: Text(
+              t.emoji.isNotEmpty ? t.emoji : '💰',
+              style: const TextStyle(fontSize: 30),
+            ),
+          ),
+        ),
         const SizedBox(height: 12),
         Text(t.title,
             style: const TextStyle(

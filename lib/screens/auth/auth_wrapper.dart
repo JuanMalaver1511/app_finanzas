@@ -5,7 +5,6 @@ import '../main/main_layout.dart';
 
 import '../login/login_screen.dart';
 import '../admin/admin_screen.dart';
-import '../dashboard/dashboard_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -15,7 +14,7 @@ class AuthWrapper extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Loading
+        /// LOADING AUTH
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -24,27 +23,43 @@ class AuthWrapper extends StatelessWidget {
 
         final user = snapshot.data;
 
-        // NO LOGUEADO → LOGIN
+        /// ❌ NO LOGUEADO
         if (user == null) {
           return const LoginScreen();
         }
 
-        // LOGUEADO → consultar rol en Firestore
+        /// LOGUEADO → CONSULTAR FIRESTORE
         return FutureBuilder<DocumentSnapshot>(
           future: FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .get(),
           builder: (context, roleSnapshot) {
+            
+            /// LOADING FIRESTORE
             if (roleSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               );
             }
 
-            final data = roleSnapshot.data?.data() as Map<String, dynamic>?;
+            /// ERROR FIRESTORE
+            if (roleSnapshot.hasError) {
+              return const Scaffold(
+                body: Center(child: Text('Error cargando usuario')),
+              );
+            }
 
-            if (data == null || data['isActive'] == false) {
+            /// DOCUMENTO NO EXISTE
+            if (!roleSnapshot.hasData || !roleSnapshot.data!.exists) {
+              FirebaseAuth.instance.signOut();
+              return const LoginScreen();
+            }
+
+            final data = roleSnapshot.data!.data() as Map<String, dynamic>;
+
+            /// USUARIO INACTIVO
+            if (data['isActive'] == false) {
               Future.microtask(() {
                 FirebaseAuth.instance.signOut();
               });
@@ -56,6 +71,7 @@ class AuthWrapper extends StatelessWidget {
 
             final role = data['role'] ?? 'user';
 
+            /// CONTROL DE ROLES
             if (role == 'admin') {
               return const AdminScreen();
             } else {

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-//import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -19,20 +20,50 @@ import 'screens/admin/security_screen.dart';
 import 'screens/profile/profile_screen.dart';
 
 Future<void> main() async {
-  //await dotenv.load(fileName: ".env");
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
 
-  FirebaseFunctions.instanceFor(region: 'us-central1');
+    // 🔥 Inicializar functions correctamente
+    FirebaseFunctions.instanceFor(region: 'us-central1');
+
+    // 🔥 CONFIG EXTRA PARA WEB (ESTABILIDAD)
+    if (kIsWeb) {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: false,
+      );
+    }
+
+  } catch (e) {
+    debugPrint("🔥 Error inicializando Firebase: $e");
+  }
 
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
+  /// FUNCIÓN PARA OBTENER ROL
+  Future<String?> _getUserRole() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return null;
+
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      return doc.data()?['role'];
+    } catch (e) {
+      debugPrint("🔥 Error obteniendo rol: $e");
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,44 +84,110 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
 
-      /// CONTROL GLOBAL DE SESIÓN
+      /// 🔥 CONTROL GLOBAL DE SESIÓN
       home: const AuthWrapper(),
 
-      /// RUTAS PROTEGIDAS
+      /// 🔥 RUTAS
       routes: {
         '/login': (context) {
           final user = FirebaseAuth.instance.currentUser;
 
           if (user != null) {
-            return const AdminScreen();
+            return const AuthWrapper();
           }
 
           return const LoginScreen();
         },
+
         '/admin': (context) {
           final user = FirebaseAuth.instance.currentUser;
 
-          if (user == null) {
-            return const LoginScreen();
-          }
+          if (user == null) return const LoginScreen();
 
-          return const AdminScreen();
+          return FutureBuilder<String?>(
+            future: _getUserRole(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.data != 'admin') {
+                return const AuthWrapper();
+              }
+
+              return const AdminScreen();
+            },
+          );
         },
+
         '/users': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
-          return const UsersScreen();
+
+          return FutureBuilder<String?>(
+            future: _getUserRole(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.data != 'admin') {
+                return const AuthWrapper();
+              }
+
+              return const UsersScreen();
+            },
+          );
         },
+
         '/activity': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
-          return const ActivityScreen();
+
+          return FutureBuilder<String?>(
+            future: _getUserRole(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.data != 'admin') {
+                return const AuthWrapper();
+              }
+
+              return const ActivityScreen();
+            },
+          );
         },
+
         '/security': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
-          return const SecurityScreen();
+
+          return FutureBuilder<String?>(
+            future: _getUserRole(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.data != 'admin') {
+                return const AuthWrapper();
+              }
+
+              return const SecurityScreen();
+            },
+          );
         },
+
         '/profile': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
