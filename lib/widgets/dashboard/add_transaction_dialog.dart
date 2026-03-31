@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/transaction_model.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:flutter/services.dart';
 
-const kAmber = Color(0xFFFFBB4E);
-const kDark = Color(0xFF1A1A2E);
-const kGrey = Color(0xFF8A8A9A);
-const kGreen = Color(0xFF1D7E45);
-const kGreenBtn = Color(0xFF27AE60);
-const kRed = Color(0xFFE74C3C);
+const kPrimary = Color(0xFF6C63FF);
+const kBackground = Color(0xFFF5F6FA);
+const kCard = Colors.white;
+
+const kIncome = Color(0xFF00C897);
+const kExpense = Color(0xFFFF5C5C);
 
 class AddTransactionDialog extends StatefulWidget {
   final Future<void> Function(AppTransaction) onAdd;
-  final AppTransaction? initial; // ✅ si viene, es edición
+  final AppTransaction? initial;
 
   const AddTransactionDialog({
     required this.onAdd,
-    this.initial, // ✅
+    this.initial,
   });
 
   @override
@@ -23,376 +27,320 @@ class AddTransactionDialog extends StatefulWidget {
 
 class _AddTransactionDialogState extends State<AddTransactionDialog> {
   late bool _isIncome;
+  String? _selectedCategory;
+  DateTime _selectedDate = DateTime.now();
+  String _selectedEmoji = '❓';
+
+  final _titleCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+
   bool _loading = false;
-  late String? _selectedCategory;
-  late DateTime _selectedDate;
-
-  late final TextEditingController _titleCtrl;
-  late final TextEditingController _amountCtrl;
-
-  final List<String> _expenseCategories = [
-    'Alimentación',
-    'Transporte',
-    'Entretenimiento',
-    'Salud',
-    'Educación',
-    'Hogar',
-    'Ropa',
-    'Servicios',
-    'Otros',
-  ];
-  final List<String> _incomeCategories = ['Ingreso', 'Trabajo', 'Otros'];
-
-  List<String> get _categories =>
-      _isIncome ? _incomeCategories : _expenseCategories;
-
-  bool get _isEditing => widget.initial != null;
+  int _step = 1;
 
   @override
   void initState() {
     super.initState();
     final tx = widget.initial;
-    // Si hay transacción inicial, pre-llenamos los campos
+
     _isIncome = tx?.isIncome ?? false;
     _selectedCategory = tx?.category;
     _selectedDate = tx?.date ?? DateTime.now();
-    _titleCtrl = TextEditingController(text: tx?.title ?? '');
-    _amountCtrl = TextEditingController(
-      text: tx != null ? tx.amount.toStringAsFixed(0) : '',
-    );
+    _selectedEmoji = tx?.emoji ?? '❓';
+
+    _titleCtrl.text = tx?.title ?? '';
+    _amountCtrl.text = tx != null ? tx.amount.toStringAsFixed(0) : '';
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      builder: (ctx, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: const ColorScheme.light(primary: kAmber),
+  // ================= FIRESTORE =================
+  Stream<List<Map<String, dynamic>>> _categoriesStream() {
+    return FirebaseFirestore.instance
+        .collection('categories')
+        .snapshots()
+        .map((s) => s.docs.map((d) => d.data()).toList());
+  }
+
+  // ================= EMOJI INTELIGENTE =================
+  final Map<String, String> keywordEmoji = {
+    // comida
+    'pizza': '🍕',
+    'hamburguesa': '🍔',
+    'comida': '🍔',
+    'restaurante': '🍽️',
+    'cafe': '☕',
+    'desayuno': '🥐',
+
+    // transporte
+    'uber': '🚗',
+    'taxi': '🚗',
+    'bus': '🚌',
+    'gasolina': '⛽',
+
+    // entretenimiento
+    'netflix': '🎬',
+    'cine': '🎬',
+    'spotify': '🎧',
+    'musica': '🎧',
+
+    // salud
+    'medico': '💊',
+    'farmacia': '💊',
+    'hospital': '🏥',
+
+    // compras
+    'ropa': '🛍️',
+    'zapatos': '👟',
+
+    // hogar
+    'arriendo': '🏠',
+    'casa': '🏠',
+    'luz': '💡',
+    'agua': '🚿',
+
+    // ingresos
+    'salario': '💰',
+    'trabajo': '💼',
+    'pago': '💰',
+  };
+
+  final Map<String, String> categoryEmoji = {
+    'Alimentación': '🍔',
+    'Transporte': '🚗',
+    'Entretenimiento': '🎬',
+    'Salud': '💊',
+    'Hogar': '🏠',
+    'Trabajo': '💼',
+    'Ingreso': '💰',
+  };
+
+  bool _emojiManual = false;
+
+  void _suggestEmoji(String text) {
+    if (_emojiManual) return;
+
+    final t = text.toLowerCase();
+
+    // 🔥 1. buscar por palabras clave
+    for (var key in keywordEmoji.keys) {
+      if (t.contains(key)) {
+        setState(() {
+          _selectedEmoji = keywordEmoji[key]!;
+        });
+        return;
+      }
+    }
+
+    // 🔥 2. usar categoría como fallback
+    if (_selectedCategory != null &&
+        categoryEmoji.containsKey(_selectedCategory)) {
+      setState(() {
+        _selectedEmoji = categoryEmoji[_selectedCategory]!;
+      });
+      return;
+    }
+
+    // 🔥 3. fallback final
+    setState(() {
+      _selectedEmoji = '💸';
+    });
+  }
+
+  // ================= EMOJI PICKER =================
+  void _pickEmoji() {
+    if (kIsWeb) {
+      _openEmojiGrid();
+    } else {
+      showModalBottomSheet(
+        context: context,
+        builder: (_) => SizedBox(
+          height: 320,
+          child: EmojiPicker(
+            onEmojiSelected: (_, emoji) {
+              setState(() => _selectedEmoji = emoji.emoji);
+              Navigator.pop(context);
+            },
+          ),
         ),
-        child: child!,
+      );
+    }
+  }
+
+  void _openEmojiGrid() {
+    final emojis = ['🍔', '🍕', '🚗', '🎬', '💊', '🛍️', '🏠', '💼', '💰'];
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text("Selecciona un emoji"),
+        content: Wrap(
+          children: emojis.map((e) {
+            return GestureDetector(
+              onTap: () {
+                setState(() => _selectedEmoji = e);
+                Navigator.pop(context);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Text(e, style: TextStyle(fontSize: 24)),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
-    if (picked != null) setState(() => _selectedDate = picked);
   }
 
+  // ================= VALIDACIÓN =================
   Future<void> _save() async {
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
+    final amount = double.tryParse(_amountCtrl.text);
+
     if (_titleCtrl.text.trim().isEmpty) {
-      _showError('Ingresa una descripción');
+      _error("Escribe una descripción");
       return;
     }
+
     if (amount == null || amount <= 0) {
-      _showError('Ingresa un monto válido');
+      _error("Monto inválido");
       return;
     }
+
     if (_selectedCategory == null) {
-      _showError('Selecciona una categoría');
+      _error("Selecciona una categoría");
       return;
     }
 
     setState(() => _loading = true);
-    try {
-      await widget.onAdd(AppTransaction(
-        id: widget.initial?.id ?? '', // ✅ conserva el id si es edición
-        title: _titleCtrl.text.trim(),
-        category: _selectedCategory!,
-        amount: amount,
-        isIncome: _isIncome,
-        date: _selectedDate,
-      ));
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) _showError('Error al guardar: $e');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+
+    await widget.onAdd(AppTransaction(
+      id: '',
+      title: _titleCtrl.text.trim(),
+      category: _selectedCategory!,
+      amount: amount,
+      isIncome: _isIncome,
+      date: _selectedDate,
+      emoji: _selectedEmoji,
+    ));
+
+    if (mounted) Navigator.pop(context);
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: kRed),
-    );
+  void _error(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  String _formatDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-  @override
-  void dispose() {
-    _titleCtrl.dispose();
-    _amountCtrl.dispose();
-    super.dispose();
-  }
-
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
     return Dialog(
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 12 : 40,
-        vertical: isMobile ? 20 : 40,
+      backgroundColor: kBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(25),
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _isEditing ? 'Editar transacción' : 'Agregar transacción',
-                    style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: kDark),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, color: kGrey),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
+        child: _step == 1 ? _step1() : _step2(),
+      ),
+    );
+  }
 
-              // Toggle Gasto / Ingreso
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() {
-                        _isIncome = false;
-                        _selectedCategory = null;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: !_isIncome ? kRed : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: !_isIncome ? kRed : Colors.grey[300]!),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('Gasto',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: !_isIncome ? Colors.white : kGrey,
-                            )),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() {
-                        _isIncome = true;
-                        _selectedCategory = null;
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: _isIncome ? kGreen : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: _isIncome ? kGreen : Colors.grey[300]!),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('Ingreso',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: _isIncome ? Colors.white : kGrey,
-                            )),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+  // STEP 1
+  Widget _step1() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text("¿Qué deseas agregar?"),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(child: _card(false, "Gasto", kExpense)),
+            const SizedBox(width: 10),
+            Expanded(child: _card(true, "Ingreso", kIncome)),
+          ],
+        ),
+      ],
+    );
+  }
 
-              const Text('Descripción',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              _Field(controller: _titleCtrl, hint: 'Ej: Compra de comida'),
-              const SizedBox(height: 14),
+  Widget _card(bool income, String text, Color color) {
+    final active = _isIncome == income;
 
-              const Text('Monto',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              _Field(
-                controller: _amountCtrl,
-                hint: '0.00',
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 14),
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isIncome = income;
+          _selectedCategory = null;
+          _step = 2;
+        });
+      },
+      child: Container(
+        height: 100,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color),
+          color: active ? color.withOpacity(0.1) : null,
+        ),
+        child: Center(child: Text(text)),
+      ),
+    );
+  }
 
-              const Text('Categoría',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedCategory,
-                    isExpanded: true,
-                    hint: const Text('Seleccione una categoría',
-                        style: TextStyle(color: kGrey, fontSize: 14)),
-                    icon: const Icon(Icons.keyboard_arrow_down, color: kGrey),
-                    items: _categories
-                        .map((cat) => DropdownMenuItem(
-                              value: cat,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                        color: _catColor(cat),
-                                        shape: BoxShape.circle),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(cat,
-                                      style: const TextStyle(
-                                          fontSize: 14, color: kDark)),
-                                ],
-                              ),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedCategory = v),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              const Text('Fecha',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: kDark)),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: _pickDate,
-                child: Container(
-                  height: 50,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_formatDate(_selectedDate),
-                          style: const TextStyle(fontSize: 14, color: kDark)),
-                      const Icon(Icons.calendar_today_outlined,
-                          size: 18, color: kGrey),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kGreenBtn,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
-                      : Text(
-                          _isEditing ? 'Guardar cambios' : 'Agregar',
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.bold),
-                        ),
-                ),
-              ),
-            ],
+  // STEP 2
+  Widget _step2() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: _pickEmoji,
+          child: Text(_selectedEmoji, style: TextStyle(fontSize: 40)),
+        ),
+        const SizedBox(height: 15),
+        TextField(
+          controller: _titleCtrl,
+          decoration: InputDecoration(
+            labelText: "Descripción",
+          ),
+          onChanged: _suggestEmoji,
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _amountCtrl,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+          ],
+          decoration: InputDecoration(
+            labelText: "Monto",
           ),
         ),
-      ),
-    );
-  }
-}
+        const SizedBox(height: 10),
+        StreamBuilder<List<Map<String, dynamic>>>(
+          key: ValueKey(_isIncome),
+          stream: _categoriesStream(),
+          builder: (_, snapshot) {
+            final categories = (snapshot.data ?? [])
+                .where((c) => c['type'] == (_isIncome ? 'income' : 'expense'))
+                .toList();
 
-class _Field extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final TextInputType? keyboardType;
-
-  const _Field({
-    required this.controller,
-    required this.hint,
-    this.keyboardType,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType,
-      style: const TextStyle(fontSize: 14, color: kDark),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: kGrey),
-        filled: true,
-        fillColor: const Color(0xFFF8F8F8),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
+            return DropdownButtonFormField<String>(
+              value: categories.any((c) => c['name'] == _selectedCategory)
+                  ? _selectedCategory
+                  : null,
+              hint: Text("Categoría"),
+              items: categories.map<DropdownMenuItem<String>>((c) {
+                return DropdownMenuItem(
+                  value: c['name'],
+                  child: Text(c['name']),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => _selectedCategory = v),
+            );
+          },
         ),
-      ),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: _loading ? null : _save,
+          child: Text("Guardar"),
+        ),
+      ],
     );
-  }
-}
-
-Color _catColor(String cat) {
-  switch (cat) {
-    case 'Alimentación':
-      return Colors.green;
-    case 'Transporte':
-      return Colors.blue;
-    case 'Entretenimiento':
-      return Colors.purple;
-    case 'Salud':
-      return Colors.red;
-    case 'Educación':
-      return Colors.orange;
-    case 'Hogar':
-      return Colors.teal;
-    case 'Ropa':
-      return Colors.pink;
-    case 'Servicios':
-      return Colors.indigo;
-    default:
-      return Colors.grey;
   }
 }
