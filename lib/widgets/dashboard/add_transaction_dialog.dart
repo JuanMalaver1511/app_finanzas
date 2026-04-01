@@ -4,10 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/transaction_model.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
-const kPrimary = Color(0xFF6C63FF);
+const kPrimary = Color(0xFFFFBB4E);
 const kBackground = Color(0xFFF5F6FA);
 const kCard = Colors.white;
+const kDark = Color(0xFF1A1A2E);
+const kGrey = Color(0xFF8A8A9A);
 
 const kIncome = Color(0xFF00C897);
 const kExpense = Color(0xFFFF5C5C);
@@ -17,6 +20,7 @@ class AddTransactionDialog extends StatefulWidget {
   final AppTransaction? initial;
 
   const AddTransactionDialog({
+    super.key,
     required this.onAdd,
     this.initial,
   });
@@ -36,6 +40,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
   bool _loading = false;
   int _step = 1;
+  bool _emojiManual = false;
 
   @override
   void initState() {
@@ -49,9 +54,19 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
     _titleCtrl.text = tx?.title ?? '';
     _amountCtrl.text = tx != null ? tx.amount.toStringAsFixed(0) : '';
+
+    if (widget.initial != null) {
+      _step = 2;
+    }
   }
 
-  // ================= FIRESTORE =================
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
   Stream<List<Map<String, dynamic>>> _categoriesStream() {
     return FirebaseFirestore.instance
         .collection('categories')
@@ -59,44 +74,30 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
         .map((s) => s.docs.map((d) => d.data()).toList());
   }
 
-  // ================= EMOJI INTELIGENTE =================
   final Map<String, String> keywordEmoji = {
-    // comida
     'pizza': '🍕',
     'hamburguesa': '🍔',
     'comida': '🍔',
     'restaurante': '🍽️',
     'cafe': '☕',
     'desayuno': '🥐',
-
-    // transporte
     'uber': '🚗',
     'taxi': '🚗',
     'bus': '🚌',
     'gasolina': '⛽',
-
-    // entretenimiento
     'netflix': '🎬',
     'cine': '🎬',
     'spotify': '🎧',
     'musica': '🎧',
-
-    // salud
     'medico': '💊',
     'farmacia': '💊',
     'hospital': '🏥',
-
-    // compras
     'ropa': '🛍️',
     'zapatos': '👟',
-
-    // hogar
     'arriendo': '🏠',
     'casa': '🏠',
     'luz': '💡',
     'agua': '🚿',
-
-    // ingresos
     'salario': '💰',
     'trabajo': '💼',
     'pago': '💰',
@@ -112,15 +113,12 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     'Ingreso': '💰',
   };
 
-  bool _emojiManual = false;
-
   void _suggestEmoji(String text) {
     if (_emojiManual) return;
 
     final t = text.toLowerCase();
 
-    // 🔥 1. buscar por palabras clave
-    for (var key in keywordEmoji.keys) {
+    for (final key in keywordEmoji.keys) {
       if (t.contains(key)) {
         setState(() {
           _selectedEmoji = keywordEmoji[key]!;
@@ -129,7 +127,6 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       }
     }
 
-    // 🔥 2. usar categoría como fallback
     if (_selectedCategory != null &&
         categoryEmoji.containsKey(_selectedCategory)) {
       setState(() {
@@ -138,24 +135,27 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       return;
     }
 
-    // 🔥 3. fallback final
     setState(() {
-      _selectedEmoji = '💸';
+      _selectedEmoji = _isIncome ? '💰' : '💸';
     });
   }
 
-  // ================= EMOJI PICKER =================
   void _pickEmoji() {
     if (kIsWeb) {
       _openEmojiGrid();
     } else {
       showModalBottomSheet(
         context: context,
+        backgroundColor: Colors.white,
+        showDragHandle: true,
         builder: (_) => SizedBox(
-          height: 320,
+          height: 340,
           child: EmojiPicker(
             onEmojiSelected: (_, emoji) {
-              setState(() => _selectedEmoji = emoji.emoji);
+              setState(() {
+                _selectedEmoji = emoji.emoji;
+                _emojiManual = true;
+              });
               Navigator.pop(context);
             },
           ),
@@ -165,22 +165,63 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   }
 
   void _openEmojiGrid() {
-    final emojis = ['🍔', '🍕', '🚗', '🎬', '💊', '🛍️', '🏠', '💼', '💰'];
+    final emojis = [
+      '🍔',
+      '🍕',
+      '🚗',
+      '🎬',
+      '💊',
+      '🛍️',
+      '🏠',
+      '💼',
+      '💰',
+      '📚',
+      '🎁',
+      '🧾',
+      '✈️',
+      '🚌',
+      '☕',
+      '💳',
+      '🛒',
+      '⚽',
+    ];
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text("Selecciona un emoji"),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        title: const Text(
+          "Selecciona un emoji",
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: Wrap(
+          spacing: 8,
+          runSpacing: 8,
           children: emojis.map((e) {
-            return GestureDetector(
+            return InkWell(
+              borderRadius: BorderRadius.circular(14),
               onTap: () {
-                setState(() => _selectedEmoji = e);
+                setState(() {
+                  _selectedEmoji = e;
+                  _emojiManual = true;
+                });
                 Navigator.pop(context);
               },
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(e, style: TextStyle(fontSize: 24)),
+              child: Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: kBackground,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    e,
+                    style: const TextStyle(fontSize: 24),
+                  ),
+                ),
               ),
             );
           }).toList(),
@@ -189,9 +230,40 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     );
   }
 
-  // ================= VALIDACIÓN =================
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Seleccionar fecha',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: kPrimary,
+            onPrimary: Colors.white,
+            onSurface: kDark,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _selectedDate.hour,
+          _selectedDate.minute,
+        );
+      });
+    }
+  }
+
   Future<void> _save() async {
-    final amount = double.tryParse(_amountCtrl.text);
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
 
     if (_titleCtrl.text.trim().isEmpty) {
       _error("Escribe una descripción");
@@ -210,137 +282,651 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
     setState(() => _loading = true);
 
-    await widget.onAdd(AppTransaction(
-      id: '',
-      title: _titleCtrl.text.trim(),
-      category: _selectedCategory!,
-      amount: amount,
-      isIncome: _isIncome,
-      date: _selectedDate,
-      emoji: _selectedEmoji,
-    ));
+    try {
+      await widget.onAdd(
+        AppTransaction(
+          id: widget.initial?.id ?? '',
+          title: _titleCtrl.text.trim(),
+          category: _selectedCategory!,
+          amount: amount,
+          isIncome: _isIncome,
+          date: _selectedDate,
+          emoji: _selectedEmoji,
+        ),
+      );
 
-    if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   void _error(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  // ================= UI =================
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: kBackground,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: _step == 1 ? _step1() : _step2(),
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
       ),
     );
   }
 
-  // STEP 1
-  Widget _step1() {
+  String _formatPreviewAmount() {
+    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.')) ?? 0;
+    final formatter = NumberFormat.currency(
+      locale: 'es_CO',
+      symbol: 'COP ',
+      decimalDigits: 0,
+    );
+    return formatter.format(amount);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.initial != null;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
+        decoration: BoxDecoration(
+          color: kBackground,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 30,
+              offset: const Offset(0, 16),
+            ),
+          ],
+        ),
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: _step == 1 ? _step1(isEdit) : _step2(isEdit),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _step1(bool isEdit) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text("¿Qué deseas agregar?"),
-        const SizedBox(height: 20),
+        _topBar(
+          title: isEdit ? "Editar movimiento" : "Nuevo movimiento",
+          subtitle: "Selecciona el tipo de transacción",
+          showClose: true,
+        ),
+        const SizedBox(height: 18),
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Center(
+                  child: Icon(
+                    Icons.swap_horiz_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Nuevo movimiento",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Selecciona si deseas registrar un ingreso o un gasto",
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.72),
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
         Row(
           children: [
-            Expanded(child: _card(false, "Gasto", kExpense)),
-            const SizedBox(width: 10),
-            Expanded(child: _card(true, "Ingreso", kIncome)),
+            Expanded(
+              child: _typeCard(
+                income: false,
+                title: "Gasto",
+                subtitle: "Salidas de dinero",
+                color: kExpense,
+                icon: Icons.arrow_upward_rounded,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _typeCard(
+                income: true,
+                title: "Ingreso",
+                subtitle: "Entradas de dinero",
+                color: kIncome,
+                icon: Icons.arrow_downward_rounded,
+              ),
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _card(bool income, String text, Color color) {
+  Widget _typeCard({
+    required bool income,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required IconData icon,
+  }) {
     final active = _isIncome == income;
 
-    return GestureDetector(
+    return InkWell(
+      borderRadius: BorderRadius.circular(22),
       onTap: () {
         setState(() {
           _isIncome = income;
           _selectedCategory = null;
           _step = 2;
+          if (!_emojiManual) {
+            _selectedEmoji = income ? '💰' : '💸';
+          }
         });
       },
-      child: Container(
-        height: 100,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 145,
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color),
-          color: active ? color.withOpacity(0.1) : null,
+          color: active ? color.withOpacity(0.12) : kCard,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: active ? color : Colors.black.withOpacity(0.05),
+            width: active ? 1.6 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(active ? 0.16 : 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        child: Center(child: Text(text)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: active ? color.withOpacity(0.18) : kBackground,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: color),
+            ),
+            const Spacer(),
+            Text(
+              title,
+              style: const TextStyle(
+                color: kDark,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: kGrey,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // STEP 2
-  Widget _step2() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: _pickEmoji,
-          child: Text(_selectedEmoji, style: TextStyle(fontSize: 40)),
-        ),
-        const SizedBox(height: 15),
-        TextField(
-          controller: _titleCtrl,
-          decoration: InputDecoration(
-            labelText: "Descripción",
-          ),
-          onChanged: _suggestEmoji,
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _amountCtrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-          ],
-          decoration: InputDecoration(
-            labelText: "Monto",
-          ),
-        ),
-        const SizedBox(height: 10),
-        StreamBuilder<List<Map<String, dynamic>>>(
-          key: ValueKey(_isIncome),
-          stream: _categoriesStream(),
-          builder: (_, snapshot) {
-            final categories = (snapshot.data ?? [])
-                .where((c) => c['type'] == (_isIncome ? 'income' : 'expense'))
-                .toList();
+  Widget _step2(bool isEdit) {
+    final actionColor = _isIncome ? kIncome : kExpense;
 
-            return DropdownButtonFormField<String>(
-              value: categories.any((c) => c['name'] == _selectedCategory)
-                  ? _selectedCategory
-                  : null,
-              hint: Text("Categoría"),
-              items: categories.map<DropdownMenuItem<String>>((c) {
-                return DropdownMenuItem(
-                  value: c['name'],
-                  child: Text(c['name']),
-                );
-              }).toList(),
-              onChanged: (v) => setState(() => _selectedCategory = v),
-            );
-          },
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _topBar(
+            title: isEdit ? "Editar movimiento" : "Nuevo movimiento",
+            subtitle: _isIncome ? "Registrar ingreso" : "Registrar gasto",
+            showBack: true,
+            onBack: () {
+              setState(() => _step = 1);
+            },
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: kCard,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: _pickEmoji,
+                      child: Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          color: actionColor.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _selectedEmoji,
+                            style: const TextStyle(fontSize: 32),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _titleCtrl.text.trim().isEmpty
+                                ? "Sin descripción"
+                                : _titleCtrl.text.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: kDark,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: actionColor.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: Text(
+                              _isIncome ? "Ingreso" : "Gasto",
+                              style: TextStyle(
+                                color: actionColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            (_amountCtrl.text.trim().isEmpty
+                                    ? (_isIncome ? "+ " : "- ")
+                                    : '${_isIncome ? "+ " : "- "}${_formatPreviewAmount()}')
+                                .trim(),
+                            style: TextStyle(
+                              color: actionColor,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: kCard,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                _sectionTitle("Información del movimiento"),
+                const SizedBox(height: 14),
+                _modernField(
+                  child: TextField(
+                    controller: _titleCtrl,
+                    onChanged: (value) {
+                      _suggestEmoji(value);
+                      setState(() {});
+                    },
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: "Ej: Pago del arriendo",
+                      labelText: "Descripción",
+                      prefixIcon: Icon(Icons.edit_note_rounded),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _modernField(
+                  child: TextField(
+                    controller: _amountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                    ],
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: "Ej: 120000",
+                      labelText: "Monto",
+                      prefixIcon: Icon(Icons.attach_money_rounded),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                StreamBuilder<List<Map<String, dynamic>>>(
+                  key: ValueKey(_isIncome),
+                  stream: _categoriesStream(),
+                  builder: (_, snapshot) {
+                    final categories = (snapshot.data ?? [])
+                        .where((c) =>
+                            c['type'] == (_isIncome ? 'income' : 'expense'))
+                        .toList();
+
+                    return _modernField(
+                      child: DropdownButtonFormField<String>(
+                        value: categories
+                                .any((c) => c['name'] == _selectedCategory)
+                            ? _selectedCategory
+                            : null,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          labelText: "Categoría",
+                          prefixIcon: Icon(Icons.grid_view_rounded),
+                        ),
+                        hint: const Text("Selecciona una categoría"),
+                        items: categories.map<DropdownMenuItem<String>>((c) {
+                          return DropdownMenuItem<String>(
+                            value: c['name'],
+                            child: Text(c['name']),
+                          );
+                        }).toList(),
+                        onChanged: (v) {
+                          setState(() {
+                            _selectedCategory = v;
+                          });
+                          _suggestEmoji(_titleCtrl.text);
+                        },
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: _pickDate,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: kBackground,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: Colors.black.withOpacity(0.05)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_month_rounded, color: kGrey),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Fecha",
+                                style: TextStyle(
+                                  color: kGrey,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                DateFormat('dd/MM/yyyy').format(_selectedDate),
+                                style: const TextStyle(
+                                  color: kDark,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded, color: kGrey),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _loading
+                      ? null
+                      : () {
+                          Navigator.pop(context);
+                        },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kDark,
+                    side: BorderSide(color: Colors.black.withOpacity(0.08)),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: const Text(
+                    "Cancelar",
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: actionColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.2,
+                          ),
+                        )
+                      : Text(
+                          isEdit
+                              ? "Actualizar movimiento"
+                              : "Guardar movimiento",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _topBar({
+    required String title,
+    required String subtitle,
+    bool showBack = false,
+    bool showClose = false,
+    VoidCallback? onBack,
+  }) {
+    return Row(
+      children: [
+        if (showBack)
+          _circleIconButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            onTap: onBack ?? () {},
+          ),
+        if (showBack) const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: kDark,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: kGrey,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
-        ElevatedButton(
-          onPressed: _loading ? null : _save,
-          child: Text("Guardar"),
+        if (showClose)
+          _circleIconButton(
+            icon: Icons.close_rounded,
+            onTap: () => Navigator.pop(context),
+          ),
+      ],
+    );
+  }
+
+  Widget _circleIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.black.withOpacity(0.05)),
+        ),
+        child: Icon(icon, color: kDark, size: 18),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Row(
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: kDark,
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _modernField({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kBackground,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.black.withOpacity(0.05)),
+      ),
+      child: child,
     );
   }
 }
