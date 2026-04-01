@@ -7,6 +7,7 @@ import '../../services/transaction_service.dart';
 import '../../models/transaction_model.dart';
 import '../../widgets/dashboard/top_bar.dart';
 import '../../widgets/dashboard/add_transaction_dialog.dart';
+import 'package:intl/intl.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
@@ -59,6 +60,252 @@ class DashboardScreen extends StatefulWidget {
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _HeroBalanceCard extends StatelessWidget {
+  final String name;
+  final double balance;
+  final double income;
+  final double expense;
+  final VoidCallback onAdd;
+
+  const _HeroBalanceCard({
+    required this.name,
+    required this.balance,
+    required this.income,
+    required this.expense,
+    required this.onAdd,
+  });
+
+  String get _greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Buenos días';
+    if (h < 18) return 'Buenas tardes';
+    return 'Buenas noches';
+  }
+
+  String get _initials {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(isMobile ? 18 : 22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1A1A2E), Color(0xFF22264A)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: kDark.withOpacity(0.20),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: isMobile ? 46 : 54,
+                height: isMobile ? 46 : 54,
+                decoration: BoxDecoration(
+                  color: kAmber.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kAmber.withOpacity(0.35)),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _initials,
+                  style: TextStyle(
+                    color: kAmber,
+                    fontWeight: FontWeight.w800,
+                    fontSize: isMobile ? 17 : 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$_greeting,',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.72),
+                        fontSize: isMobile ? 12 : 13,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isMobile ? 18 : 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isMobile)
+                FilledButton.icon(
+                  onPressed: onAdd,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kAmber,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text(
+                    'Nueva transacción',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Text(
+            'Saldo disponible',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.70),
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _formatMoney(balance),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isMobile ? 28 : 38,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: (balance >= 0 ? kGreen : kRed).withOpacity(0.16),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: (balance >= 0 ? kGreen : kRed).withOpacity(0.30),
+              ),
+            ),
+            child: Text(
+              balance >= 0 ? 'Balance positivo' : 'Balance negativo',
+              style: TextStyle(
+                color: balance >= 0
+                    ? const Color(0xFF86E6AE)
+                    : const Color(0xFFFF9A8A),
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: _heroMiniStat(
+                  icon: Icons.south_rounded,
+                  color: kGreen,
+                  label: 'Ingresos',
+                  value: _formatMoney(income),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _heroMiniStat(
+                  icon: Icons.north_rounded,
+                  color: kRed,
+                  label: 'Gastos',
+                  value: _formatMoney(expense),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _heroMiniStat({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.68),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
@@ -142,7 +389,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 TopBar(
-                  onNew: _showAddDialog,
+                  onNew: () {},
                   onProfile: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const ProfileScreen()),
@@ -155,12 +402,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _WelcomeBanner(name: _userName),
-                        const SizedBox(height: 16),
-                        _BalanceCards(
+                        _HeroBalanceCard(
+                          name: _userName,
                           balance: balance,
                           income: income,
                           expense: expense,
+                          onAdd: _showAddDialog,
                         ),
                         const SizedBox(height: 16),
 
@@ -197,7 +444,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _TransactionsCard(
                           transactions: transactions,
                           onDelete: (id) => _txService.delete(id),
-                          onEdit: _showEditDialog, // ✅ nuevo
+                          onEdit: _showEditDialog, 
                         ),
 
                         // Espacio extra en móvil para el FAB
@@ -556,7 +803,7 @@ class _DonutCard extends StatelessWidget {
                     Text('${(e.value / total * 100).toInt()}%',
                         style: const TextStyle(fontSize: 11, color: kGrey)),
                     const SizedBox(width: 8),
-                    Text('COP ${e.value.toStringAsFixed(0)}',
+                    Text(_formatMoney(e.value),
                         style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -665,7 +912,7 @@ class _BudgetBarsCard extends StatelessWidget {
                                 color: kDark)),
                       ]),
                       Text(
-                          'COP ${spent.toStringAsFixed(0)} / ${budget.toStringAsFixed(0)}',
+                          '${_formatMoney(spent)} / ${_formatMoney(budget)}',
                           style: const TextStyle(fontSize: 10, color: kGrey)),
                     ],
                   ),
@@ -801,7 +1048,7 @@ class _TxRow extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            '${tx.isIncome ? '+' : '-'} COP ${tx.amount.toStringAsFixed(0)}',
+            '${tx.isIncome ? '+' : '-'} ${_formatMoney(tx.amount)}',
             style: TextStyle(
                 fontSize: isMobile ? 12 : 13,
                 fontWeight: FontWeight.bold,
@@ -877,3 +1124,12 @@ Widget _emptyCard(String title, String msg) => Container(
         ],
       ),
     );
+
+String _formatMoney(double value) {
+  final formatter = NumberFormat.currency(
+    locale: 'es_CO',
+    symbol: 'COP ',
+    decimalDigits: 0,
+  );
+  return formatter.format(value);
+}

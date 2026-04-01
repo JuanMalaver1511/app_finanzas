@@ -60,104 +60,152 @@ class TopBar extends StatelessWidget {
           // DERECHA
           Row(
             children: [
-              // ➕ SOLO WEB
-              if (isWeb)
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: ElevatedButton.icon(
-                    onPressed: onNew,
-                    icon: const Icon(Icons.add),
-                    label: const Text("Nueva transacción"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kAmber,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              // NOTIFICACIONES
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        // luego aquí abrimos las notificaciones
+                      },
+                      child: Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: const Color(0xFFF0F2F5),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.notifications_none_rounded,
+                          color: kDark,
+                          size: 23,
+                        ),
                       ),
                     ),
                   ),
-                ),
-
-              // NOTIFICACIONES
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.notifications_none, color: kDark),
+                  Positioned(
+                    right: 3,
+                    top: 3,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE74C3C),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
               ),
 
-              // 🚪 LOGOUT SOLO EN MÓVIL/TABLET (CON MODAL)
+              const SizedBox(width: 6),
+
+              // LOGOUT SOLO EN MÓVIL/TABLET (CON MODAL)
               if (!isWeb)
-                IconButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      barrierColor: Colors.black54,
-                      builder: (context) {
-                        return Center(
-                          child: Container(
-                            width: 320,
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF2EEF5),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  "Cerrar sesión",
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        barrierColor: Colors.black54,
+                        builder: (context) {
+                          return Center(
+                            child: Container(
+                              width: 320,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF2EEF5),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Cerrar sesión",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "¿Estás seguro de que deseas cerrar sesión?",
-                                  style: TextStyle(fontSize: 13),
-                                ),
-                                const SizedBox(height: 20),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text("Cancelar"),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: kAmber,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 18,
-                                          vertical: 10,
-                                        ),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    "¿Estás seguro de que deseas cerrar sesión?",
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text("Cancelar"),
                                       ),
-                                      onPressed: () async {
-                                        Navigator.pop(context);
-                                        await onLogout();
-                                      },
-                                      child: const Text("Cerrar sesión"),
-                                    ),
-                                  ],
-                                )
-                              ],
+                                      const SizedBox(width: 10),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: kAmber,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 18,
+                                            vertical: 10,
+                                          ),
+                                        ),
+                                        onPressed: () async {
+                                          Navigator.pop(context);
+                                          await onLogout();
+                                        },
+                                        child: const Text("Cerrar sesión"),
+                                      ),
+                                    ],
+                                  )
+                                ],
+                              ),
                             ),
+                          );
+                        },
+                      );
+                    },
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
                           ),
-                        );
-                      },
-                    );
-                  },
-                  icon: const Icon(Icons.logout, color: kDark),
+                        ],
+                        border: Border.all(
+                          color: const Color(0xFFF0F2F5),
+                        ),
+                      ),
+                      child: const Icon(Icons.logout, color: kDark, size: 21),
+                    ),
+                  ),
                 ),
             ],
           ),
