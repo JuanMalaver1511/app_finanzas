@@ -5,6 +5,7 @@ import '../../models/transaction_model.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 const kPrimary = Color(0xFFFFBB4E);
 const kBackground = Color(0xFFF5F6FA);
@@ -68,10 +69,43 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   }
 
   Stream<List<Map<String, dynamic>>> _categoriesStream() {
-    return FirebaseFirestore.instance
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    final globalStream =
+        FirebaseFirestore.instance.collection('categories').snapshots();
+
+    final userStream = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
         .collection('categories')
-        .snapshots()
-        .map((s) => s.docs.map((d) => d.data()).toList());
+        .snapshots();
+
+    return globalStream.asyncMap((globalSnap) async {
+      final userSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('categories')
+          .get();
+
+      final globalCats = globalSnap.docs.map((d) => d.data()).toList();
+      final userCats = userSnap.docs.map((d) => d.data()).toList();
+
+      final merged = [...globalCats, ...userCats];
+
+      final seen = <String>{};
+      final unique = <Map<String, dynamic>>[];
+
+      for (final cat in merged) {
+        final key =
+            '${cat['name']?.toString().trim().toLowerCase()}_${cat['type']}';
+        if (!seen.contains(key)) {
+          seen.add(key);
+          unique.add(cat);
+        }
+      }
+
+      return unique;
+    });
   }
 
   final Map<String, String> keywordEmoji = {
@@ -304,15 +338,76 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   }
 
   void _error(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+    _showToast(msg);
+  }
+
+  void _showToast(String message, {bool success = false}) {
+    final overlay = Overlay.of(context);
+
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 12,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder(
+            duration: const Duration(milliseconds: 300),
+            tween: Tween<double>(begin: 0, end: 1),
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.translate(
+                  offset: Offset(0, -20 * (1 - value)),
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color:
+                    success ? const Color(0xFF1E8E3E) : const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    success
+                        ? Icons.check_circle_rounded
+                        : Icons.warning_amber_rounded,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
+
+    overlay.insert(overlayEntry);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      overlayEntry.remove();
+    });
   }
 
   String _formatPreviewAmount() {
@@ -323,6 +418,191 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       decimalDigits: 0,
     );
     return formatter.format(amount);
+  }
+
+  Future<void> _openCreateCategoryDialog() async {
+    final controller = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: kBackground,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: kPrimary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.add_box_rounded,
+                      color: kPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Nueva categoría',
+                          style: TextStyle(
+                            color: kDark,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Crea una categoría personalizada para tus movimientos',
+                          style: TextStyle(
+                            color: kGrey,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                decoration: BoxDecoration(
+                  color: kCard,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.black.withOpacity(0.05)),
+                ),
+                child: TextField(
+                  controller: controller,
+                  decoration: const InputDecoration(
+                    hintText: 'Ej: Mascotas',
+                    labelText: 'Nombre de la categoría',
+                    border: InputBorder.none,
+                    prefixIcon: Icon(Icons.edit_rounded),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kDark,
+                        side: BorderSide(color: Colors.black.withOpacity(0.08)),
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final name = controller.text.trim();
+                        if (name.isEmpty) {
+                          _error("Escribe un nombre para la categoría");
+                          return;
+                        }
+
+                        final uid = FirebaseAuth.instance.currentUser!.uid;
+
+                        final existingGlobal = await FirebaseFirestore.instance
+                            .collection('categories')
+                            .where('name', isEqualTo: name)
+                            .where('type',
+                                isEqualTo: _isIncome ? 'income' : 'expense')
+                            .get();
+
+                        final existingUser = await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .collection('categories')
+                            .where('name', isEqualTo: name)
+                            .where('type',
+                                isEqualTo: _isIncome ? 'income' : 'expense')
+                            .get();
+
+                        if (existingGlobal.docs.isNotEmpty ||
+                            existingUser.docs.isNotEmpty) {
+                          _error("La categoría ya existe");
+                          return;
+                        }
+
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .collection('categories')
+                            .add({
+                          'name': name,
+                          'type': _isIncome ? 'income' : 'expense',
+                          'isDefault': false,
+                          'createdAt': FieldValue.serverTimestamp(),
+                        });
+
+                        if (!mounted) return;
+
+                        setState(() {
+                          _selectedCategory = name;
+                        });
+
+                        _suggestEmoji(name);
+
+                        Navigator.pop(context);
+                        _showToast("Categoría creada correctamente",
+                            success: true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Guardar',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -695,30 +975,53 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                             c['type'] == (_isIncome ? 'income' : 'expense'))
                         .toList();
 
+                    final normalizedSelected = _selectedCategory?.trim();
+
+                    final selectedValue = categories.any(
+                      (c) =>
+                          (c['name'] ?? '').toString().trim() ==
+                          normalizedSelected,
+                    )
+                        ? normalizedSelected
+                        : null;
+
                     return _modernField(
-                      child: DropdownButtonFormField<String>(
-                        value: categories
-                                .any((c) => c['name'] == _selectedCategory)
-                            ? _selectedCategory
-                            : null,
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          labelText: "Categoría",
-                          prefixIcon: Icon(Icons.grid_view_rounded),
-                        ),
-                        hint: const Text("Selecciona una categoría"),
-                        items: categories.map<DropdownMenuItem<String>>((c) {
-                          return DropdownMenuItem<String>(
-                            value: c['name'],
-                            child: Text(c['name']),
-                          );
-                        }).toList(),
-                        onChanged: (v) {
-                          setState(() {
-                            _selectedCategory = v;
-                          });
-                          _suggestEmoji(_titleCtrl.text);
-                        },
+                      child: Column(
+                        children: [
+                          DropdownButtonFormField<String>(
+                            value: selectedValue,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              labelText: "Categoría",
+                              prefixIcon: Icon(Icons.grid_view_rounded),
+                            ),
+                            hint: const Text("Selecciona una categoría"),
+                            items:
+                                categories.map<DropdownMenuItem<String>>((c) {
+                              final name = (c['name'] ?? '').toString().trim();
+                              return DropdownMenuItem<String>(
+                                value: name,
+                                child: Text(name),
+                              );
+                            }).toList(),
+                            onChanged: (v) {
+                              setState(() {
+                                _selectedCategory = v?.trim();
+                              });
+                              _suggestEmoji(_titleCtrl.text);
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: _openCreateCategoryDialog,
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Crear nueva categoría'),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
