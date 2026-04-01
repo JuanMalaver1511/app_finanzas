@@ -40,11 +40,14 @@ dependencies:
   cloud_firestore: ^4.17.5
   firebase_storage: ^11.7.7  
   cloud_functions: ^4.7.0
+
   fl_chart: ^0.66.0
   table_calendar: ^3.0.9
   emoji_picker_flutter: ^1.6.3
-
   file_picker: ^8.0.7
+
+  flutter_local_notifications: ^17.0.0 
+  http: ^1.2.0 
 
   flutter_localizations:
     sdk: flutter

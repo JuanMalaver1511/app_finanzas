@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../dashboard/dashboard_screen.dart';
 import '../movements/movements_screen.dart';
+import '../debts/deudas_screen.dart';
+import '../goals/goals_screen.dart';
 import '../profile/profile_screen.dart';
 import '../../widgets/common/app_sidebar.dart';
 
@@ -22,8 +24,8 @@ class _MainLayoutState extends State<MainLayout> {
   List<Widget> get _screens => [
         const DashboardScreen(),
         const MovementsScreen(),
-        const Center(child: Text("Metas próximamente")),
-        const Center(child: Text("Deudas próximamente")),
+        const GoalsScreen(),
+        const DeudasScreen(),
         ProfileScreen(onBack: () => _onChange(0)),
       ];
 

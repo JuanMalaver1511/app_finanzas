@@ -8,6 +8,7 @@ import '../../models/transaction_model.dart';
 import '../../widgets/dashboard/top_bar.dart';
 import '../../widgets/dashboard/add_transaction_dialog.dart';
 import 'package:intl/intl.dart';
+import '../../widgets/IA/ia.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
@@ -117,6 +118,11 @@ class _HeroBalanceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 🔥 BOTÓN IA
+          const IAInsightButton(),
+
+          const SizedBox(height: 16),
+
           Row(
             children: [
               Container(
@@ -186,7 +192,9 @@ class _HeroBalanceCard extends StatelessWidget {
                 ),
             ],
           ),
+
           const SizedBox(height: 22),
+
           Text(
             'Saldo disponible',
             style: TextStyle(
@@ -194,7 +202,9 @@ class _HeroBalanceCard extends StatelessWidget {
               fontSize: 13,
             ),
           ),
+
           const SizedBox(height: 6),
+
           Text(
             _formatMoney(balance),
             style: TextStyle(
@@ -204,7 +214,9 @@ class _HeroBalanceCard extends StatelessWidget {
               letterSpacing: -1,
             ),
           ),
+
           const SizedBox(height: 8),
+
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
@@ -225,7 +237,9 @@ class _HeroBalanceCard extends StatelessWidget {
               ),
             ),
           ),
+
           const SizedBox(height: 18),
+
           Row(
             children: [
               Expanded(
@@ -444,7 +458,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _TransactionsCard(
                           transactions: transactions,
                           onDelete: (id) => _txService.delete(id),
-                          onEdit: _showEditDialog, 
+                          onEdit: _showEditDialog,
                         ),
 
                         // Espacio extra en móvil para el FAB
@@ -911,8 +925,7 @@ class _BudgetBarsCard extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                                 color: kDark)),
                       ]),
-                      Text(
-                          '${_formatMoney(spent)} / ${_formatMoney(budget)}',
+                      Text('${_formatMoney(spent)} / ${_formatMoney(budget)}',
                           style: const TextStyle(fontSize: 10, color: kGrey)),
                     ],
                   ),
