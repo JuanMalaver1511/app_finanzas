@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../dashboard/dashboard_screen.dart';
 import '../movements/movements_screen.dart';
+import '../debts/deudas_screen.dart';
+import '../goals/goals_screen.dart';
 import '../profile/profile_screen.dart';
 import '../../widgets/common/app_sidebar.dart';
+import '../budgets/budgets_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -20,12 +23,13 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   List<Widget> get _screens => [
-        const DashboardScreen(),
-        const MovementsScreen(),
-        const Center(child: Text("Metas próximamente")),
-        const Center(child: Text("Deudas próximamente")),
-        ProfileScreen(onBack: () => _onChange(0)),
-      ];
+      DashboardScreen(onChange: _onChange),
+      const MovementsScreen(),
+      const BudgetsScreen(),
+      const GoalsScreen(),
+      const DeudasScreen(),
+      ProfileScreen(onBack: () => _onChange(0)),
+    ];
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +59,8 @@ class _MainLayoutState extends State<MainLayout> {
                     icon: Icon(Icons.dashboard), label: "Inicio"),
                 BottomNavigationBarItem(
                     icon: Icon(Icons.swap_horiz), label: "Mov."),
+                BottomNavigationBarItem(
+                    icon: Icon(Icons.pie_chart_outline), label: "Pres."),
                 BottomNavigationBarItem(icon: Icon(Icons.flag), label: "Metas"),
                 BottomNavigationBarItem(
                     icon: Icon(Icons.credit_card), label: "Deudas"),

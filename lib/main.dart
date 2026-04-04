@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -23,22 +24,22 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
+    // 🔥 CARGAR ENV (ESTO FALTABA)
+    await dotenv.load(fileName: ".env");
+
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // 🔥 Inicializar functions correctamente
     FirebaseFunctions.instanceFor(region: 'us-central1');
 
-    // 🔥 CONFIG EXTRA PARA WEB (ESTABILIDAD)
     if (kIsWeb) {
       FirebaseFirestore.instance.settings = const Settings(
         persistenceEnabled: false,
       );
     }
-
   } catch (e) {
-    debugPrint("🔥 Error inicializando Firebase: $e");
+    debugPrint("🔥 Error inicializando: $e");
   }
 
   runApp(const MyApp());
@@ -98,7 +99,6 @@ class MyApp extends StatelessWidget {
 
           return const LoginScreen();
         },
-
         '/admin': (context) {
           final user = FirebaseAuth.instance.currentUser;
 
@@ -121,7 +121,6 @@ class MyApp extends StatelessWidget {
             },
           );
         },
-
         '/users': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
@@ -143,7 +142,6 @@ class MyApp extends StatelessWidget {
             },
           );
         },
-
         '/activity': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
@@ -165,7 +163,6 @@ class MyApp extends StatelessWidget {
             },
           );
         },
-
         '/security': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
@@ -187,7 +184,6 @@ class MyApp extends StatelessWidget {
             },
           );
         },
-
         '/profile': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();

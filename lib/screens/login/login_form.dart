@@ -3,9 +3,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../widgets/common/custom_alert.dart';
-import '../dashboard/dashboard_screen.dart';
 import '../admin/admin_screen.dart';
 import '../../models/user_model.dart';
+import '../main/main_layout.dart';
 
 class LoginForm extends StatefulWidget {
   final VoidCallback onRegister;
@@ -232,7 +232,7 @@ class _LoginFormState extends State<LoginForm> {
 
           setState(() => isLoading = false);
 
-          return; 
+          return;
         }
 
         await _firestore.updateUserLoginData(user.uid);
@@ -252,7 +252,7 @@ class _LoginFormState extends State<LoginForm> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => const DashboardScreen(),
+              builder: (_) => const MainLayout(),
             ),
           );
         }

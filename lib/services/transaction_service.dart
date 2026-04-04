@@ -21,4 +21,57 @@ class TransactionService {
   Future<void> delete(String id) => _col.doc(id).delete();
 
   Future<void> update(AppTransaction tx) => _col.doc(tx.id).update(tx.toMap());
+
+  // 🔥 RESUMEN GENERAL (ROBUSTO)
+  Future<Map<String, dynamic>> getResumenMensual() async {
+    final snapshot = await _col.get();
+
+    final now = DateTime.now();
+
+    double ingresos = 0;
+    double gastos = 0;
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      // 🔥 AMOUNT
+      double amount = 0;
+      final rawAmount = data['amount'];
+
+      if (rawAmount is int) {
+        amount = rawAmount.toDouble();
+      } else if (rawAmount is double) {
+        amount = rawAmount;
+      }
+
+      // 🔥 isIncome
+      final isIncome = data['isIncome'];
+
+      // 🔥 FECHA (CLAVE)
+      DateTime? date;
+      if (data['date'] is Timestamp) {
+        date = (data['date'] as Timestamp).toDate();
+      }
+
+      if (date == null) continue;
+
+      // ✅ FILTRO POR MES ACTUAL
+      if (date.month == now.month && date.year == now.year) {
+        if (isIncome == true) {
+          ingresos += amount;
+        } else {
+          gastos += amount;
+        }
+      }
+    }
+
+    final balance = ingresos - gastos;
+
+    return {
+      'ingresos': ingresos,
+      'gastos': gastos,
+      'balance': balance,
+      'mes': now.month,
+    };
+  }
 }

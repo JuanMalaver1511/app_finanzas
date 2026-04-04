@@ -74,12 +74,6 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     final globalStream =
         FirebaseFirestore.instance.collection('categories').snapshots();
 
-    final userStream = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('categories')
-        .snapshots();
-
     return globalStream.asyncMap((globalSnap) async {
       final userSnap = await FirebaseFirestore.instance
           .collection('users')
@@ -535,28 +529,46 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                         }
 
                         final uid = FirebaseAuth.instance.currentUser!.uid;
+                        final nameLower = name.toLowerCase().trim();
 
                         final existingGlobal = await FirebaseFirestore.instance
                             .collection('categories')
-                            .where('name', isEqualTo: name)
-                            .where('type',
-                                isEqualTo: _isIncome ? 'income' : 'expense')
+                            .where('nameLower', isEqualTo: nameLower)
                             .get();
 
                         final existingUser = await FirebaseFirestore.instance
                             .collection('users')
                             .doc(uid)
                             .collection('categories')
-                            .where('name', isEqualTo: name)
-                            .where('type',
-                                isEqualTo: _isIncome ? 'income' : 'expense')
+                            .where('nameLower', isEqualTo: nameLower)
                             .get();
 
                         if (existingGlobal.docs.isNotEmpty ||
                             existingUser.docs.isNotEmpty) {
-                          _error("La categoría ya existe");
+                          _error("Ya existe una categoría con ese nombre");
                           return;
                         }
+
+                        const categoryPalette = [
+                          '#6366F1',
+                          '#E11D48',
+                          '#84CC16',
+                          '#06B6D4',
+                          '#1F2937',
+                          '#374151',
+                          '#9CA3AF',
+                          '#F43F5E',
+                          '#22C55E',
+                          '#EAB308',
+                          '#FB7185',
+                          '#C084FC',
+                          '#67E8F9',
+                          '#A3E635'
+                        ];
+
+                        final color = categoryPalette[
+                            DateTime.now().millisecondsSinceEpoch %
+                                categoryPalette.length];
 
                         await FirebaseFirestore.instance
                             .collection('users')
@@ -564,8 +576,10 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                             .collection('categories')
                             .add({
                           'name': name,
+                          'nameLower': nameLower,
                           'type': _isIncome ? 'income' : 'expense',
                           'isDefault': false,
+                          'color': color,
                           'createdAt': FieldValue.serverTimestamp(),
                         });
 
