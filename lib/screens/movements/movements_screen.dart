@@ -660,23 +660,31 @@ class _MovementsScreenState extends State<MovementsScreen>
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _miniCard('Ingresos', income, kGreen, Icons.south_rounded),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _miniCard('Gastos', expense, kRed, Icons.north_rounded),
-            ),
-          ],
-        ),
+        if (isMobile) ...[
+          _miniCard('Ingresos', income, kGreen, Icons.south_rounded),
+          const SizedBox(height: 12),
+          _miniCard('Gastos', expense, kRed, Icons.north_rounded),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child:
+                    _miniCard('Ingresos', income, kGreen, Icons.south_rounded),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _miniCard('Gastos', expense, kRed, Icons.north_rounded),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }
 
   Widget _miniCard(String title, double value, Color color, IconData icon) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: kCard,
@@ -705,10 +713,17 @@ class _MovementsScreenState extends State<MovementsScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: kGrey, fontSize: 12)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: kGrey,
+                    fontSize: 12,
+                  ),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   _formatCOP(value),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: color,

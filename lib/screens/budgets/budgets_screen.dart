@@ -39,6 +39,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   bool _loading = true;
   bool _financeDialogShown = false;
   bool _missingBudgetDialogShown = false;
+  bool _categoryNotificationSyncRunning = false;
 
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
 
@@ -124,6 +125,11 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
 
   String _monthKeyFromDate(DateTime date) {
     return DateFormat('yyyy-MM').format(date);
+  }
+
+  bool get _isCurrentMonth {
+    final now = DateTime.now();
+    return _selectedMonth.year == now.year && _selectedMonth.month == now.month;
   }
 
   Future<bool> _ensureMonthBudgetExists() async {
@@ -282,40 +288,48 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       setState(() => _loading = true);
     }
 
+    final selectedMonth = _selectedMonth;
+    final monthKey = DateFormat('yyyy-MM').format(selectedMonth);
+    final monthStart = DateTime(selectedMonth.year, selectedMonth.month);
+    final monthEnd = DateTime(selectedMonth.year, selectedMonth.month + 1);
+
     try {
-      final financeSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('settings')
-          .doc('finance')
-          .get();
+      final results = await Future.wait([
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('settings')
+            .doc('finance')
+            .get(),
+        FirebaseFirestore.instance.collection('categories').get(),
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('categories')
+            .get(),
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('transactions')
+            .where('date',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+            .where('date', isLessThan: Timestamp.fromDate(monthEnd))
+            .get(),
+      ]);
 
-      final globalSnap =
-          await FirebaseFirestore.instance.collection('categories').get();
-
-      final userSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('categories')
-          .get();
-
-      final copiedFromPreviousMonth = await _ensureMonthBudgetExists();
+      final financeSnap = results[0] as DocumentSnapshot<Map<String, dynamic>>;
+      final globalSnap = results[1] as QuerySnapshot<Map<String, dynamic>>;
+      final userSnap = results[2] as QuerySnapshot<Map<String, dynamic>>;
+      bool copiedFromPreviousMonth = false;
+      final transactionsSnap =
+          results[3] as QuerySnapshot<Map<String, dynamic>>;
 
       final budgetsSnap = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .collection('budgets')
-          .doc(_monthKey)
+          .doc(monthKey)
           .collection('items')
-          .get();
-
-      final transactionsSnap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('transactions')
-          .where('date',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(_monthStart))
-          .where('date', isLessThan: Timestamp.fromDate(_monthEnd))
           .get();
 
       final global = globalSnap.docs.map((doc) {
@@ -423,6 +437,19 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           return aName.compareTo(bName);
         });
 
+      final validKeys = categories
+          .map((cat) => (cat['budgetKey'] ?? '').toString())
+          .where((key) => key.isNotEmpty)
+          .toSet();
+
+      final keysToRemove =
+          _controllers.keys.where((key) => !validKeys.contains(key)).toList();
+
+      for (final key in keysToRemove) {
+        _controllers[key]?.dispose();
+        _controllers.remove(key);
+      }
+
       for (final cat in categories) {
         final key = (cat['budgetKey'] ?? '').toString();
         if (key.isEmpty) continue;
@@ -447,101 +474,52 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         _spentMap = spent;
       });
 
-      /// ===============================
-      /// NOTIFICACIONES POR CATEGORÍA
-      /// ===============================
-      final futures = <Future>[];
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final copied = await _ensureMonthBudgetExists();
 
-      for (final cat in categories) {
-        final categoryKey = (cat['budgetKey'] ?? '').toString().trim();
-        final categoryName = (cat['displayName'] ?? '').toString().trim();
+        if (!mounted || !copied) return;
 
-        if (categoryKey.isEmpty || categoryName.isEmpty) continue;
-
-        final planned =
-            (budgets[categoryKey]?['planned'] as num?)?.toDouble() ?? 0;
-        final spentAmount = spent[categoryKey] ?? 0;
-
-        if (spentAmount <= 0) continue;
-
-        /// 🔴 SIN PRESUPUESTO
-        if (planned <= 0) {
-          futures.add(
-            _notificationService.createUnique(
-              dedupeKey: 'budget_missing_with_spend_${_monthKey}_$categoryKey',
-              title: 'Gastaste sin presupuesto',
-              message:
-                  'Ya registraste gastos en $categoryName pero no tienes presupuesto definido.',
-              type: 'budget_missing_with_spend',
-              priority: 'medium',
-              source: 'system',
-            ),
-          );
-          continue;
-        }
-
-        /// 🔴 EXCEDIDO
-        if (spentAmount >= planned) {
-          futures.add(
-            _notificationService.createUnique(
-              dedupeKey: 'budget_exceeded_${_monthKey}_$categoryKey',
-              title: 'Presupuesto excedido',
-              message: 'Superaste el presupuesto en $categoryName.',
-              type: 'budget_exceeded',
-              priority: 'high',
-              source: 'system',
-            ),
-          );
-          continue;
-        }
-
-        /// 🟠 ALERTA
-        if (spentAmount >= planned * 0.8) {
-          futures.add(
-            _notificationService.createUnique(
-              dedupeKey: 'budget_warning_${_monthKey}_$categoryKey',
-              title: 'Estás cerca del límite',
-              message: 'Ya casi alcanzas el presupuesto en $categoryName.',
-              type: 'budget_warning',
-              priority: 'medium',
-              source: 'system',
-            ),
-          );
-        }
-      }
-
-      await Future.wait(futures);
-
-      if (copiedFromPreviousMonth && mounted) {
         _showToast(
-          'Presupuestos de ${_monthName(_selectedMonth.month)} creados con base en ${_monthName(_previousMonth(_selectedMonth).month)}',
+          'Presupuestos de ${_monthName(_selectedMonth.month)} creados automáticamente',
           success: true,
         );
 
         final previousMonthKey =
             _monthKeyFromDate(_previousMonth(_selectedMonth));
-        final dedupeKey =
-            'budget_auto_created_${_monthKey}_from_$previousMonthKey';
 
         await _notificationService.createUnique(
-          dedupeKey: dedupeKey,
+          dedupeKey: 'budget_auto_created_${_monthKey}_from_$previousMonthKey',
           title: 'Presupuesto creado automáticamente',
           message:
-              'Tus presupuestos de ${_monthName(_selectedMonth.month)} fueron creados con base en ${_monthName(_previousMonth(_selectedMonth).month)}.',
+              'Tus presupuestos fueron copiados del mes anterior automáticamente.',
           type: 'budget_auto_created',
           priority: 'low',
           source: 'system',
         );
-      }
 
-      if (!copiedFromPreviousMonth && budgetsSnap.docs.isEmpty && mounted) {
-        final dedupeKey = 'month_without_budget_$_monthKey';
+        if (mounted) {
+          _loadData();
+        }
+      });
+
+      _queueCategoryNotificationSync(
+        categories: categories,
+        budgets: budgets,
+        spent: spent,
+        monthKey: monthKey,
+      );
+
+      if (_isCurrentMonth &&
+          !copiedFromPreviousMonth &&
+          budgetsSnap.docs.isEmpty &&
+          mounted) {
+        final dedupeKey = 'month_without_budget_$monthKey';
 
         await _notificationService.createUnique(
           dedupeKey: dedupeKey,
           title: 'Aún no has creado tus presupuestos',
           message:
-              'Todavía no has definido presupuestos para ${_monthName(_selectedMonth.month)}. Configúralos para tener mejor control de tus gastos.',
+              'Todavía no has definido presupuestos para ${_monthName(selectedMonth.month)}. Configúralos para tener mejor control de tus gastos.',
           type: 'month_without_budget',
           priority: 'medium',
           source: 'system',
@@ -566,11 +544,149 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           }
         });
       }
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('Error al cargar presupuestos: $e');
+      debugPrintStack(stackTrace: st);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
+      }
+    }
+  }
+
+  void _queueCategoryNotificationSync({
+    required List<Map<String, dynamic>> categories,
+    required Map<String, Map<String, dynamic>> budgets,
+    required Map<String, double> spent,
+    required String monthKey,
+  }) {
+    if (_categoryNotificationSyncRunning) return;
+
+    _categoryNotificationSyncRunning = true;
+
+    Future.microtask(() async {
+      try {
+        await _syncCategoryNotifications(
+          categories: categories,
+          budgets: budgets,
+          spent: spent,
+          monthKey: monthKey,
+        );
+      } catch (e) {
+        debugPrint('Error sincronizando notificaciones por categoría: $e');
+      } finally {
+        _categoryNotificationSyncRunning = false;
+      }
+    });
+  }
+
+  Future<void> _syncCategoryNotifications({
+    required List<Map<String, dynamic>> categories,
+    required Map<String, Map<String, dynamic>> budgets,
+    required Map<String, double> spent,
+    required String monthKey,
+  }) async {
+    for (final cat in categories) {
+      final categoryKey = (cat['budgetKey'] ?? '').toString().trim();
+      final categoryName = (cat['displayName'] ?? '').toString().trim();
+
+      if (categoryKey.isEmpty || categoryName.isEmpty) continue;
+
+      final planned =
+          (budgets[categoryKey]?['planned'] as num?)?.toDouble() ?? 0;
+      final spentAmount = spent[categoryKey] ?? 0;
+
+      await _syncSingleCategoryNotification(
+        monthKey: monthKey,
+        categoryKey: categoryKey,
+        categoryName: categoryName,
+        planned: planned,
+        spentAmount: spentAmount,
+      );
+    }
+  }
+
+  Future<void> _syncSingleCategoryNotification({
+    required String monthKey,
+    required String categoryKey,
+    required String categoryName,
+    required double planned,
+    required double spentAmount,
+  }) async {
+    final missingKey = 'budget_missing_with_spend_${monthKey}_$categoryKey';
+    final exceededKey = 'budget_exceeded_${monthKey}_$categoryKey';
+    final warningKey = 'budget_warning_${monthKey}_$categoryKey';
+
+    if (spentAmount <= 0) {
+      await _removeNotificationsByDedupeKeys([
+        missingKey,
+        exceededKey,
+        warningKey,
+      ]);
+      return;
+    }
+
+    if (planned <= 0) {
+      await _removeNotificationsByDedupeKeys([exceededKey, warningKey]);
+
+      await _notificationService.createUnique(
+        dedupeKey: missingKey,
+        title: 'Gastaste sin presupuesto',
+        message:
+            'Ya registraste gastos en $categoryName pero no tienes presupuesto definido.',
+        type: 'budget_missing_with_spend',
+        priority: 'medium',
+        source: 'system',
+      );
+      return;
+    }
+
+    if (spentAmount >= planned) {
+      await _removeNotificationsByDedupeKeys([missingKey, warningKey]);
+
+      await _notificationService.createUnique(
+        dedupeKey: exceededKey,
+        title: 'Presupuesto excedido',
+        message: 'Superaste el presupuesto en $categoryName.',
+        type: 'budget_exceeded',
+        priority: 'high',
+        source: 'system',
+      );
+      return;
+    }
+
+    if (spentAmount >= planned * 0.8) {
+      await _removeNotificationsByDedupeKeys([missingKey, exceededKey]);
+
+      await _notificationService.createUnique(
+        dedupeKey: warningKey,
+        title: 'Estás cerca del límite',
+        message: 'Ya casi alcanzas el presupuesto en $categoryName.',
+        type: 'budget_warning',
+        priority: 'medium',
+        source: 'system',
+      );
+      return;
+    }
+
+    await _removeNotificationsByDedupeKeys([
+      missingKey,
+      exceededKey,
+      warningKey,
+    ]);
+  }
+
+  Future<void> _removeNotificationsByDedupeKeys(List<String> dedupeKeys) async {
+    for (final dedupeKey in dedupeKeys) {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notifications')
+          .where('dedupeKey', isEqualTo: dedupeKey)
+          .get();
+
+      for (final doc in snap.docs) {
+        await doc.reference.delete();
       }
     }
   }
@@ -1011,6 +1127,13 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         'monthKey': _monthKey,
       };
 
+      _queueCategoryNotificationSync(
+        categories: _categories,
+        budgets: _budgetsMap,
+        spent: _spentMap,
+        monthKey: _monthKey,
+      );
+
       if (!mounted) return;
       _showToast('Presupuesto guardado', success: true);
       setState(() {
@@ -1030,6 +1153,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   }) async {
     final categoryId = (category['id'] ?? '').toString().trim();
     final categoryKey = (category['budgetKey'] ?? '').toString().trim();
+    final categoryName = (category['displayName'] ?? '').toString().trim();
 
     if (categoryId.isEmpty || categoryKey.isEmpty) return;
 
@@ -1047,6 +1171,14 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
 
       _budgetsMap.remove(categoryKey);
       _controllers[categoryKey]?.clear();
+
+      await _syncSingleCategoryNotification(
+        monthKey: _monthKey,
+        categoryKey: categoryKey,
+        categoryName: categoryName,
+        planned: 0,
+        spentAmount: _spentMap[categoryKey] ?? 0,
+      );
 
       if (!mounted) return;
       _showToast('Presupuesto eliminado', success: true);
@@ -1260,6 +1392,89 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   }
 
   Widget _topHeader() {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _handleBack,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: kCard,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kDark.withOpacity(0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: kDark,
+                    size: 18,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 6,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: kPrimary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Presupuestos',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: kDark,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 24,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _headerIconButton(
+                icon: Icons.help_outline_rounded,
+                onTap: _showHelpDialog,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _showCreateBudgetCategoryDialog,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Crear categoría'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                foregroundColor: kDark,
+                elevation: 0,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Row(
       children: [
         GestureDetector(
@@ -1298,6 +1513,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         const Expanded(
           child: Text(
             'Presupuestos',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: kDark,
               fontWeight: FontWeight.w800,
@@ -1305,6 +1522,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             ),
           ),
         ),
+        const SizedBox(width: 10),
         _headerIconButton(
           icon: Icons.help_outline_rounded,
           onTap: _showHelpDialog,
@@ -1531,8 +1749,9 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (!_hasFinancialProfile) _financialProfileWarningCard(),
-                  if (_hasFinancialProfile) _financialProfileCard(),
-                  if (_hasFinancialProfile) const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                  _financialProfileCard(),
+                  const SizedBox(height: 16),
                   if (overBudget) _overBudgetAlertCard(),
                   if (overBudget) const SizedBox(height: 16),
                   _insightCard(
@@ -1824,6 +2043,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   }
 
   Widget _financialProfileCard() {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -1857,6 +2078,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               const Expanded(
                 child: Text(
                   'Tu base financiera',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: kDark,
                     fontSize: 16,
@@ -1871,33 +2094,53 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _miniInfoBox(
-                  label: 'Ingreso mensual',
-                  value: _formatMoney(_monthlyIncome),
-                  color: kInfo,
+          if (isMobile) ...[
+            _miniInfoBox(
+              label: 'Ingreso mensual',
+              value: _formatMoney(_monthlyIncome),
+              color: kInfo,
+            ),
+            const SizedBox(height: 10),
+            _miniInfoBox(
+              label: 'Tipo',
+              value: _incomeType == 'fixed' ? 'Fijo' : 'Variable',
+              color: kPrimary,
+            ),
+            const SizedBox(height: 10),
+            _miniInfoBox(
+              label: 'Día de pago',
+              value: _payday?.toString() ?? 'No definido',
+              color: kSuccess,
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _miniInfoBox(
+                    label: 'Ingreso mensual',
+                    value: _formatMoney(_monthlyIncome),
+                    color: kInfo,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _miniInfoBox(
-                  label: 'Tipo',
-                  value: _incomeType == 'fixed' ? 'Fijo' : 'Variable',
-                  color: kPrimary,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _miniInfoBox(
+                    label: 'Tipo',
+                    value: _incomeType == 'fixed' ? 'Fijo' : 'Variable',
+                    color: kPrimary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _miniInfoBox(
-                  label: 'Día de pago',
-                  value: _payday?.toString() ?? 'No definido',
-                  color: kSuccess,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _miniInfoBox(
+                    label: 'Día de pago',
+                    value: _payday?.toString() ?? 'No definido',
+                    color: kSuccess,
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1909,6 +2152,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     required Color color,
   }) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
@@ -1928,7 +2172,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           const SizedBox(height: 4),
           Text(
             value,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               color: kDark,
@@ -2214,6 +2458,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     required Map<String, dynamic> category,
     required bool isSaving,
   }) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
     final categoryName = (category['displayName'] ?? '').toString().trim();
     final categoryKey = (category['budgetKey'] ?? '').toString().trim();
     final colorHex = (category['color'] ?? '#CBD5E1').toString().trim();
@@ -2285,33 +2531,70 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               ],
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _infoChip(
-                    label: 'Planeado',
-                    value: hasBudget ? _formatMoney(planned) : 'Sin definir',
-                    valueColor: hasBudget ? kDark : kGrey,
+            if (isMobile) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _infoChip(
+                      label: 'Planeado',
+                      value: hasBudget ? _formatMoney(planned) : 'Sin definir',
+                      valueColor: hasBudget ? kDark : kGrey,
+                      compact: true,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _infoChip(
-                    label: 'Gastado',
-                    value: _formatMoney(spent),
-                    valueColor: spent > 0 ? kDanger : kGrey,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _infoChip(
+                      label: 'Gastado',
+                      value: _formatMoney(spent),
+                      valueColor: spent > 0 ? kDanger : kGrey,
+                      compact: true,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _infoChip(
-                    label: 'Disponible',
-                    value: _formatMoney(remaining),
-                    valueColor: remaining >= 0 ? kSuccess : kDanger,
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _infoChip(
+                      label: 'Disponible',
+                      value: _formatMoney(remaining),
+                      valueColor: remaining >= 0 ? kSuccess : kDanger,
+                      compact: true,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _infoChip(
+                      label: 'Planeado',
+                      value: hasBudget ? _formatMoney(planned) : 'Sin definir',
+                      valueColor: hasBudget ? kDark : kGrey,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _infoChip(
+                      label: 'Gastado',
+                      value: _formatMoney(spent),
+                      valueColor: spent > 0 ? kDanger : kGrey,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _infoChip(
+                      label: 'Disponible',
+                      value: _formatMoney(remaining),
+                      valueColor: remaining >= 0 ? kSuccess : kDanger,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 14),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
@@ -2578,32 +2861,37 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     required String label,
     required String value,
     required Color valueColor,
+    bool compact = false,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      height: compact ? 64 : 72, // 🔥 clave para que todos midan igual
+      padding: EdgeInsets.all(compact ? 10 : 12),
       decoration: BoxDecoration(
         color: kBackground,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center, // centra vertical
         children: [
           Text(
             label,
-            style: const TextStyle(
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
               color: kGrey,
-              fontSize: 11,
+              fontSize: compact ? 10 : 11,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            maxLines: 1,
+            maxLines: 1, // 🔥 evita que rompa a dos líneas
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: valueColor,
-              fontSize: 13,
+              fontSize: compact ? 12 : 13,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -2760,8 +3048,15 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
 
       await userRef.collection('categories').doc(categoryId).delete();
 
+      await _removeNotificationsByDedupeKeys([
+        'budget_missing_with_spend_${_monthKey}_$categoryKey',
+        'budget_exceeded_${_monthKey}_$categoryKey',
+        'budget_warning_${_monthKey}_$categoryKey',
+      ]);
+
       _budgetsMap.remove(categoryKey);
-      _controllers[categoryKey]?.clear();
+      _controllers[categoryKey]?.dispose();
+      _controllers.remove(categoryKey);
       _categories.removeWhere(
         (cat) => (cat['id'] ?? '').toString().trim() == categoryId,
       );
@@ -2955,7 +3250,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                             DateTime.now().millisecondsSinceEpoch %
                                 _categoryPalette.length];
 
-                        await FirebaseFirestore.instance
+                        final newDoc = await FirebaseFirestore.instance
                             .collection('users')
                             .doc(uid)
                             .collection('categories')
@@ -2968,19 +3263,63 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                           'createdAt': FieldValue.serverTimestamp(),
                         });
 
+                        final newCategory = {
+                          'id': newDoc.id,
+                          'name': name,
+                          'nameLower': nameLower,
+                          'type': 'expense',
+                          'isDefault': false,
+                          'color': color,
+                          'source': 'user',
+                          'budgetKey': nameLower,
+                          'displayName': name,
+                        };
+
+                        _controllers.putIfAbsent(
+                          nameLower,
+                          () => TextEditingController(),
+                        );
+
                         if (!mounted) return;
 
                         Navigator.pop(context);
 
-                        await _loadData();
-
-                        if (!mounted) return;
-
-                        _showToast('Categoría creada', success: true);
-
                         setState(() {
+                          _categories = [..._categories, newCategory]
+                            ..sort((a, b) {
+                              final aKey = (a['budgetKey'] ?? '').toString();
+                              final bKey = (b['budgetKey'] ?? '').toString();
+
+                              final aPriority = _priorityForCategory(
+                                planned: (_budgetsMap[aKey]?['planned'] as num?)
+                                        ?.toDouble() ??
+                                    0,
+                                spent: _spentMap[aKey] ?? 0,
+                              );
+
+                              final bPriority = _priorityForCategory(
+                                planned: (_budgetsMap[bKey]?['planned'] as num?)
+                                        ?.toDouble() ??
+                                    0,
+                                spent: _spentMap[bKey] ?? 0,
+                              );
+
+                              if (aPriority != bPriority) {
+                                return aPriority.compareTo(bPriority);
+                              }
+
+                              final aName = (a['displayName'] ?? '')
+                                  .toString()
+                                  .toLowerCase();
+                              final bName = (b['displayName'] ?? '')
+                                  .toString()
+                                  .toLowerCase();
+                              return aName.compareTo(bName);
+                            });
                           _expandedCategoryKey = nameLower;
                         });
+
+                        _showToast('Categoría creada', success: true);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kPrimary,
