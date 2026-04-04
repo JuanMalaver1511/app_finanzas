@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../services/transaction_service.dart';
-import '../../services/deepseek_IA.dart';
+import '../../services/DeepSeek_IA.dart';
 import '../../services/notificationIA.dart';
 
 class IAInsightButton extends StatefulWidget {
