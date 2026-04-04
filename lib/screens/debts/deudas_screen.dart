@@ -136,7 +136,9 @@ class PagoHistorial {
 // PANTALLA PRINCIPAL
 // ─────────────────────────────────────────────────────────────────────────────
 class DeudasScreen extends StatefulWidget {
-  const DeudasScreen({super.key});
+  const DeudasScreen({
+    super.key,
+  });
 
   @override
   State<DeudasScreen> createState() => _DeudasScreenState();
@@ -243,7 +245,9 @@ class _DeudasScreenState extends State<DeudasScreen>
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+            onTap: () {
+              Navigator.pushNamed(context, '/');
+            },
             child: Container(
               width: 38,
               height: 38,
@@ -1577,7 +1581,13 @@ class _DeudasScreenState extends State<DeudasScreen>
                 ),
                 const SizedBox(height: 20),
                 GestureDetector(
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      Navigator.pushReplacementNamed(context, '/dashboard');
+                    }
+                  },
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 14),

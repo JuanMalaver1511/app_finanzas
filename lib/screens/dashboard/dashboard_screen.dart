@@ -216,7 +216,7 @@ class _HeroBalanceCard extends StatelessWidget {
             _formatMoney(balance),
             style: TextStyle(
               color: Colors.white,
-              fontSize: isMobile ? 28 : 38,
+              fontSize: isMobile ? 26 : 36,
               fontWeight: FontWeight.w900,
               letterSpacing: -1,
             ),
@@ -247,27 +247,45 @@ class _HeroBalanceCard extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          Row(
-            children: [
-              Expanded(
-                child: _heroMiniStat(
-                  icon: Icons.south_rounded,
-                  color: kGreen,
-                  label: 'Ingresos',
-                  value: _formatMoney(income),
+          const SizedBox(height: 18),
+
+          if (isMobile) ...[
+            _heroMiniStat(
+              icon: Icons.south_rounded,
+              color: kGreen,
+              label: 'Ingresos',
+              value: _formatMoney(income),
+            ),
+            const SizedBox(height: 12),
+            _heroMiniStat(
+              icon: Icons.north_rounded,
+              color: kRed,
+              label: 'Gastos',
+              value: _formatMoney(expense),
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _heroMiniStat(
+                    icon: Icons.south_rounded,
+                    color: kGreen,
+                    label: 'Ingresos',
+                    value: _formatMoney(income),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _heroMiniStat(
-                  icon: Icons.north_rounded,
-                  color: kRed,
-                  label: 'Gastos',
-                  value: _formatMoney(expense),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _heroMiniStat(
+                    icon: Icons.north_rounded,
+                    color: kRed,
+                    label: 'Gastos',
+                    value: _formatMoney(expense),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -280,6 +298,7 @@ class _HeroBalanceCard extends StatelessWidget {
     required String value,
   }) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.08),
@@ -289,27 +308,30 @@ class _HeroBalanceCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               color: color.withOpacity(0.14),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 22),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.68),
                     fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   maxLines: 1,
@@ -317,7 +339,7 @@ class _HeroBalanceCard extends StatelessWidget {
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
-                    fontSize: 13,
+                    fontSize: 20,
                   ),
                 ),
               ],
@@ -1284,13 +1306,25 @@ Widget _emptyCard(String title, String msg) => Container(
       ),
     );
 
-String _formatMoney(double value) {
+String _formatMoney(double value, {bool compact = false}) {
+  if (compact) {
+    if (value >= 1000000) {
+      final v = value / 1000000;
+      return '${v.toStringAsFixed(v >= 10 ? 0 : 1)} M';
+    }
+    if (value >= 1000) {
+      final v = value / 1000;
+      return '${v.toStringAsFixed(v >= 10 ? 0 : 1)} K';
+    }
+    return value.toStringAsFixed(0);
+  }
+
   final formatter = NumberFormat.currency(
     locale: 'es_CO',
-    symbol: 'COP ',
+    symbol: '',
     decimalDigits: 0,
   );
-  return formatter.format(value);
+  return '${formatter.format(value)} COP';
 }
 
 Color _parseColor(String? hex) {
