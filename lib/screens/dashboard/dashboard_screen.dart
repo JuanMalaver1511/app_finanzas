@@ -9,6 +9,8 @@ import '../../widgets/dashboard/top_bar.dart';
 import '../../widgets/dashboard/add_transaction_dialog.dart';
 import 'package:intl/intl.dart';
 import '../../widgets/IA/ia.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../notifications/notifications_screen.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
@@ -57,7 +59,12 @@ IconData _catIcon(String cat) => kCategoryIcons[cat] ?? Icons.receipt_outlined;
 // ─── DASHBOARD SCREEN ──────────────────────────────────────────────────────────
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final ValueChanged<int> onChange;
+
+  const DashboardScreen({
+    super.key,
+    required this.onChange,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -404,6 +411,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 TopBar(
                   onNew: () {},
+                  onNotifications: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen(),
+                    ),
+                  ),
                   onProfile: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const ProfileScreen()),
@@ -433,7 +446,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   children: [
                                     _DonutCard(transactions: transactions),
                                     const SizedBox(height: 16),
-                                    _BudgetBarsCard(transactions: transactions),
+                                    _BudgetBarsCard(
+                                      transactions: transactions,
+                                      onOpenBudgets: () => widget.onChange(2),
+                                    ),
                                   ],
                                 );
                               }
@@ -447,7 +463,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: _BudgetBarsCard(
-                                        transactions: transactions),
+                                      transactions: transactions,
+                                      onOpenBudgets: () => widget.onChange(2),
+                                    ),
                                   ),
                                 ],
                               );
@@ -867,83 +885,211 @@ class _DonutPainter extends CustomPainter {
 
 class _BudgetBarsCard extends StatelessWidget {
   final List<AppTransaction> transactions;
-  const _BudgetBarsCard({required this.transactions});
+  final VoidCallback onOpenBudgets;
 
-  static const Map<String, double> _budgets = {
-    'Alimentación': 600000, // mercado básico mensual
-    'Transporte': 200000, // bus, gasolina, etc
-    'Entretenimiento': 150000,
-    'Salud': 250000,
-    'Educación': 300000,
-    'Hogar': 1500000, // arriendo + gastos
-    'Ropa': 150000,
-    'Servicios': 300000, // agua, luz, internet
-    'Otros': 150000,
-  };
+  const _BudgetBarsCard({
+    required this.transactions,
+    required this.onOpenBudgets,
+  });
+
+  String get _monthKey {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final Map<String, double> totals = {};
-    for (final tx in transactions.where((t) => !t.isIncome)) {
-      totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
-    }
+    final uid = FirebaseAuth.instance.currentUser!.uid;
 
-    final cats = _budgets.keys.toList();
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('budgets')
+          .doc(_monthKey)
+          .collection('items')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return _loadingCard();
+        }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Presupuestos',
-              style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.bold, color: kDark)),
-          const SizedBox(height: 16),
-          ...cats.map((cat) {
-            final spent = totals[cat] ?? 0.0;
-            final budget = _budgets[cat]!;
-            final pct = (spent / budget).clamp(0.0, 1.0);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 13),
+        final docs = snapshot.data!.docs;
+
+        if (docs.isEmpty) {
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: onOpenBudgets,
+              child: _emptyCard(
+                'Presupuesto del mes',
+                'Aún no has definido presupuestos. Toca para configurarlos.',
+              ),
+            ),
+          );
+        }
+
+        final Map<String, double> totals = {};
+        for (final tx in transactions.where((t) => !t.isIncome)) {
+          totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
+        }
+
+        final items = docs.map((d) {
+          final data = d.data() as Map<String, dynamic>;
+
+          return {
+            'name': data['categoryName'],
+            'planned': ((data['planned'] ?? 0) as num).toDouble(),
+            'color': data['color'] ?? '#6366F1',
+          };
+        }).toList();
+
+        final totalBudget =
+            items.fold<double>(0, (sum, i) => sum + i['planned']);
+        final totalSpent = totals.values.fold<double>(0, (sum, v) => sum + v);
+
+        final totalProgress =
+            totalBudget > 0 ? (totalSpent / totalBudget).clamp(0.0, 1.0) : 0.0;
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onOpenBudgets,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: _cardDecoration(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // HEADER
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(children: [
-                        Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                                color: _catColor(cat), shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Text(cat,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: kDark)),
-                      ]),
-                      Text('${_formatMoney(spent)} / ${_formatMoney(budget)}',
-                          style: const TextStyle(fontSize: 10, color: kGrey)),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Presupuesto del mes',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: kDark,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Basado en tu configuración',
+                              style: TextStyle(fontSize: 12, color: kGrey),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: kGrey),
                     ],
                   ),
-                  const SizedBox(height: 5),
+
+                  const SizedBox(height: 18),
+
+                  // RESUMEN
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(999),
                     child: LinearProgressIndicator(
-                      value: pct,
-                      backgroundColor: const Color(0xFFEEEEEE),
-                      valueColor: AlwaysStoppedAnimation(_catColor(cat)),
-                      minHeight: 7,
+                      value: totalProgress,
+                      minHeight: 8,
+                      backgroundColor: const Color(0xFFEAECEF),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        totalProgress >= 1
+                            ? kRed
+                            : totalProgress >= 0.8
+                                ? kAmber
+                                : kPrimary,
+                      ),
                     ),
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // ITEMS
+                  ...items.map((item) {
+                    final name = item['name'];
+                    final planned = item['planned'];
+                    final color = _parseColor(item['color']);
+
+                    final spent = totals[name] ?? 0.0;
+                    final pct = (spent / planned).clamp(0.0, 1.0);
+                    final exceeded = spent > planned;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: kDark,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${_formatMoney(spent)} / ${_formatMoney(planned)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: exceeded ? kRed : kGrey,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          LinearProgressIndicator(
+                            value: pct,
+                            minHeight: 6,
+                            backgroundColor: const Color(0xFFEAECEF),
+                            valueColor: AlwaysStoppedAnimation(
+                              exceeded ? kRed : color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                 ],
               ),
-            );
-          }),
-        ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _loadingCard() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onOpenBudgets,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: _cardDecoration(),
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
       ),
     );
   }
@@ -1145,4 +1291,22 @@ String _formatMoney(double value) {
     decimalDigits: 0,
   );
   return formatter.format(value);
+}
+
+Color _parseColor(String? hex) {
+  if (hex == null || hex.trim().isEmpty) {
+    return const Color(0xFFCBD5E1);
+  }
+
+  final clean = hex.replaceAll('#', '').trim();
+
+  if (clean.length != 6) {
+    return const Color(0xFFCBD5E1);
+  }
+
+  try {
+    return Color(int.parse('FF$clean', radix: 16));
+  } catch (_) {
+    return const Color(0xFFCBD5E1);
+  }
 }

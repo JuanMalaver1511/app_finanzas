@@ -4,7 +4,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/user_model.dart';
 import '../../widgets/common/custom_alert.dart';
-import '../dashboard/dashboard_screen.dart';
+import '../main/main_layout.dart';
 
 class RegisterForm extends StatefulWidget {
   final VoidCallback onLogin;
@@ -140,7 +140,7 @@ class _RegisterFormState extends State<RegisterForm> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const DashboardScreen(),
+          builder: (_) => const MainLayout(),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -209,7 +209,7 @@ class _RegisterFormState extends State<RegisterForm> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => const DashboardScreen(),
+          builder: (_) => const MainLayout(),
         ),
       );
     } catch (_) {

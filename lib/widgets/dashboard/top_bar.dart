@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../services/notification_service.dart';
 
 const kAmber = Color(0xFFFFBB4E);
 const kGrey = Color(0xFF8A8A9A);
@@ -6,12 +8,14 @@ const kDark = Color(0xFF1A1A2E);
 
 class TopBar extends StatelessWidget {
   final VoidCallback onNew;
+  final VoidCallback onNotifications;
   final VoidCallback onProfile;
   final Future<void> Function() onLogout;
 
   const TopBar({
     super.key,
     required this.onNew,
+    required this.onNotifications,
     required this.onProfile,
     required this.onLogout,
   });
@@ -20,6 +24,7 @@ class TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isWeb = width >= 900;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Container(
       color: Colors.white,
@@ -48,7 +53,7 @@ class TopBar extends StatelessWidget {
               if (!isWeb) const SizedBox(width: 8),
               if (!isWeb)
                 const Text(
-                  "Kybo",
+                  'Kybo',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -68,9 +73,7 @@ class TopBar extends StatelessWidget {
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        // luego aquí abrimos las notificaciones
-                      },
+                      onTap: onNotifications,
                       child: Container(
                         width: 46,
                         height: 46,
@@ -96,19 +99,61 @@ class TopBar extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Positioned(
-                    right: 3,
-                    top: 3,
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE74C3C),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
+
+                  if (uid != null)
+                    StreamBuilder<int>(
+                      stream: NotificationService(uid).unreadCount(),
+                      builder: (context, snapshot) {
+                        final count = snapshot.data ?? 0;
+
+                        if (count <= 0) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final text = count > 99 ? '99+' : '$count';
+
+                        return Positioned(
+                          right: -2,
+                          top: -2,
+                          child: Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 18,
+                              minHeight: 18,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE74C3C),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.10),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                text,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
                 ],
               ),
 
@@ -138,7 +183,7 @@ class TopBar extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    "Cerrar sesión",
+                                    'Cerrar sesión',
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -146,7 +191,7 @@ class TopBar extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 10),
                                   const Text(
-                                    "¿Estás seguro de que deseas cerrar sesión?",
+                                    '¿Estás seguro de que deseas cerrar sesión?',
                                     style: TextStyle(fontSize: 13),
                                   ),
                                   const SizedBox(height: 20),
@@ -155,7 +200,7 @@ class TopBar extends StatelessWidget {
                                     children: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(context),
-                                        child: const Text("Cancelar"),
+                                        child: const Text('Cancelar'),
                                       ),
                                       const SizedBox(width: 10),
                                       ElevatedButton(
@@ -175,7 +220,7 @@ class TopBar extends StatelessWidget {
                                           Navigator.pop(context);
                                           await onLogout();
                                         },
-                                        child: const Text("Cerrar sesión"),
+                                        child: const Text('Cerrar sesión'),
                                       ),
                                     ],
                                   )

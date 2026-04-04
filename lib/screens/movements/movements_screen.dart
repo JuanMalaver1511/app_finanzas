@@ -14,7 +14,6 @@ const kCard = Colors.white;
 const kDark = Color(0xFF1A1A2E);
 const kGrey = Color(0xFF8A8A9A);
 const kGreen = Color(0xFF1D7E45);
-const kGreenBtn = Color(0xFF27AE60);
 const kRed = Color(0xFFE74C3C);
 const kAmberLight = Color(0xFFFFF3DC);
 
@@ -131,11 +130,62 @@ class _MovementsScreenState extends State<MovementsScreen>
   }
 
   Future<void> _loadCategories() async {
-    final snap =
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    final globalSnap =
         await FirebaseFirestore.instance.collection('categories').get();
 
+    final userSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('categories')
+        .get();
+
+    final global = globalSnap.docs.map((d) => {
+          ...d.data(),
+          'id': d.id,
+        });
+
+    final user = userSnap.docs.map((d) => {
+          ...d.data(),
+          'id': d.id,
+        });
+
+    final merged = [...global, ...user];
+
+    final seen = <String>{};
+    final unique = <Map<String, dynamic>>[];
+
+    for (final cat in merged) {
+      final name = (cat['name'] ?? '').toString().trim();
+      if (name.isEmpty) continue;
+
+      final key = name.toLowerCase();
+      if (!seen.contains(key)) {
+        seen.add(key);
+        unique.add(cat);
+      }
+    }
+
+    unique.sort((a, b) {
+      final aName = (a['name'] ?? '').toString().toLowerCase();
+      final bName = (b['name'] ?? '').toString().toLowerCase();
+      return aName.compareTo(bName);
+    });
+
+    if (!mounted) return;
+
     setState(() {
-      _categories = snap.docs.map((d) => d.data()).toList();
+      _categories = unique;
+
+      final stillExists = _selectedCategory == null ||
+          unique.any(
+              (cat) => (cat['name'] ?? '').toString() == _selectedCategory);
+
+      if (!stillExists) {
+        _selectedCategory = null;
+        _selectedTypeFilter = 'all';
+      }
     });
   }
 
@@ -848,7 +898,11 @@ class _MovementsScreenState extends State<MovementsScreen>
     );
   }
 
-  void _showCategoryModal() {
+  void _showCategoryModal() async {
+    await _loadCategories();
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -886,62 +940,9 @@ class _MovementsScreenState extends State<MovementsScreen>
                     },
                   );
                 }),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.add),
-                  title: const Text("Nueva categoría"),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showAddCategoryDialog();
-                  },
-                ),
               ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  void _showAddCategoryDialog() {
-    final controller = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: const Text("Nueva categoría"),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              hintText: "Ej: 🍔 Comida",
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancelar"),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final text = controller.text.trim();
-
-                if (text.isNotEmpty) {
-                  await FirebaseFirestore.instance
-                      .collection('categories')
-                      .add({
-                    'name': text,
-                    'type': 'expense',
-                  });
-
-                  await _loadCategories();
-                }
-
-                Navigator.pop(context);
-              },
-              child: const Text("Guardar"),
-            ),
-          ],
         );
       },
     );
@@ -1363,8 +1364,8 @@ class _MovementsScreenState extends State<MovementsScreen>
     }
   }
 
-  void _openAddTransaction() {
-    showDialog(
+  void _openAddTransaction() async {
+    await showDialog(
       context: context,
       builder: (_) => AddTransactionDialog(
         onAdd: (tx) async {
@@ -1372,10 +1373,13 @@ class _MovementsScreenState extends State<MovementsScreen>
         },
       ),
     );
+
+    if (!mounted) return;
+    await _loadCategories();
   }
 
-  void _openEditTransaction(AppTransaction tx) {
-    showDialog(
+  void _openEditTransaction(AppTransaction tx) async {
+    await showDialog(
       context: context,
       builder: (_) => AddTransactionDialog(
         initial: tx,
@@ -1384,6 +1388,9 @@ class _MovementsScreenState extends State<MovementsScreen>
         },
       ),
     );
+
+    if (!mounted) return;
+    await _loadCategories();
   }
 
   String _formatCOP(double value) {
@@ -1405,33 +1412,6 @@ class _MovementsScreenState extends State<MovementsScreen>
 
   String _timeStr(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-
-  IconData _categoryIcon(String cat) {
-    switch (cat.toLowerCase()) {
-      case 'trabajo':
-        return Icons.work_outline_rounded;
-      case 'ingreso':
-        return Icons.savings_outlined;
-      case 'entretenimiento':
-        return Icons.movie_filter_outlined;
-      case 'ropa':
-        return Icons.checkroom_outlined;
-      case 'alimentación':
-        return Icons.restaurant_outlined;
-      case 'transporte':
-        return Icons.directions_car_outlined;
-      case 'salud':
-        return Icons.favorite_border_rounded;
-      case 'educación':
-        return Icons.school_outlined;
-      case 'hogar':
-        return Icons.home_outlined;
-      case 'servicios':
-        return Icons.receipt_outlined;
-      default:
-        return Icons.attach_money_rounded;
-    }
-  }
 
   String _monthName(int m) => const [
         'Enero',

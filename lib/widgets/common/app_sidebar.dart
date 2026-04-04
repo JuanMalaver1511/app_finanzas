@@ -18,7 +18,7 @@ class AppSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 90,
+      width: 96,
       decoration: const BoxDecoration(
         color: kDark,
       ),
@@ -30,8 +30,8 @@ class AppSidebar extends StatelessWidget {
           Column(
             children: [
               Container(
-                width: 50,
-                height: 50,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   color: kAmber,
                   borderRadius: BorderRadius.circular(14),
@@ -50,14 +50,15 @@ class AppSidebar extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 30),
+          const SizedBox(height: 18),
 
           // MENÚ
           _item(Icons.dashboard_outlined, "Inicio", 0),
           _item(Icons.swap_horiz, "Mov.", 1),
-          _item(Icons.flag_outlined, "Metas", 2),
-          _item(Icons.credit_card, "Deudas", 3),
-          _item(Icons.person_outline, "Perfil", 4),
+          _item(Icons.pie_chart_outline, "Pres.", 2),
+          _item(Icons.flag_outlined, "Metas", 3),
+          _item(Icons.credit_card, "Deudas", 4),
+          _item(Icons.person_outline, "Perfil", 5),
 
           const Spacer(),
           GestureDetector(
@@ -90,7 +91,7 @@ class AppSidebar extends StatelessWidget {
                             "¿Estás seguro de que deseas cerrar sesión?",
                             style: TextStyle(fontSize: 13),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 14),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
@@ -127,9 +128,9 @@ class AppSidebar extends StatelessWidget {
               );
             },
 
-            // 🔥 ESTE ES EL FIX
+            // ESTE ES EL FIX
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.only(bottom: 14),
               child: Column(
                 children: const [
                   Icon(Icons.logout, color: Colors.white70),
@@ -162,13 +163,12 @@ class AppSidebar extends StatelessWidget {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: 50,
-                  height: 50,
-                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  width: 46,
+                  height: 46,
+                  margin: const EdgeInsets.symmetric(vertical: 4),
                   decoration: BoxDecoration(
-                    color: active
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.05),
+                    color:
+                        active ? Colors.white : Colors.white.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: active
                         ? [
@@ -182,13 +182,13 @@ class AppSidebar extends StatelessWidget {
                   child: Icon(
                     icon,
                     color: active ? kDark : Colors.white70,
-                    size: 22 + (value * 2),
+                    size: 20 + (value * 2),
                   ),
                 ),
                 AnimatedDefaultTextStyle(
                   duration: const Duration(milliseconds: 200),
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9.5,
                     color: active ? Colors.white : Colors.white60,
                     fontWeight: active ? FontWeight.w600 : FontWeight.normal,
                   ),
