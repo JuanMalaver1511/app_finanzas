@@ -3,7 +3,18 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class DeepSeekService {
-  String get apiKey => dotenv.env['DEEPSEEK_API_KEY'] ?? '';
+  String get apiKey {
+    const fromDefine = String.fromEnvironment('DEEPSEEK_API_KEY');
+    final fromEnv = dotenv.env['DEEPSEEK_API_KEY'];
+
+    final key = fromDefine.isNotEmpty ? fromDefine : (fromEnv ?? '');
+
+    if (key.isEmpty) {
+      throw Exception("API KEY no encontrada");
+    }
+
+    return key;
+  }
 
   Future<String> analizarFinanzas({
     required double ingresos,
