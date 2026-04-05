@@ -1,21 +1,43 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class DeepSeekService {
-  String get apiKey {
-    const fromDefine = String.fromEnvironment('DEEPSEEK_API_KEY');
-    final fromEnv = dotenv.env['DEEPSEEK_API_KEY'];
+  // 🔥 URL de tu API en Vercel
+  final String baseUrl = "https://bfinanzas-kw8e.vercel.app/api/deepseek";
 
-    final key = fromDefine.isNotEmpty ? fromDefine : (fromEnv ?? '');
+  /// ==============================
+  /// 💬 Chat simple
+  /// ==============================
+  Future<String> sendMessage(String message) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(baseUrl),
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: jsonEncode({
+              "message": message,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
-    if (key.isEmpty) {
-      throw Exception("API KEY no encontrada");
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['choices'][0]['message']['content'] ?? "Sin respuesta";
+      } else {
+        print("❌ Error IA: ${response.body}");
+        return "No se pudo obtener respuesta.";
+      }
+    } catch (e) {
+      print("🔥 Error conexión IA: $e");
+      return "Error de conexión con la IA.";
     }
-
-    return key;
   }
 
+  /// ==============================
+  /// 📊 Análisis financiero
+  /// ==============================
   Future<String> analizarFinanzas({
     required double ingresos,
     required double gastos,
@@ -23,14 +45,7 @@ class DeepSeekService {
     required double balance,
     required int mes,
   }) async {
-    if (apiKey.isEmpty) {
-      throw Exception("API KEY no encontrada");
-    }
-
-    final url = Uri.parse("https://api.deepseek.com/v1/chat/completions");
-
     double porcentaje = ingresos > 0 ? (gastos / ingresos) * 100 : 0;
-
     final nombreMes = _getNombreMes(mes);
 
     final prompt = """
@@ -42,7 +57,9 @@ Datos:
 Mes: $nombreMes
 Ingresos: $ingresos
 Gastos: $gastos
+Deudas: $deudas
 Balance: $balance
+Porcentaje de gasto: ${porcentaje.toStringAsFixed(1)}%
 
 Responde en máximo 2 líneas:
 
@@ -50,28 +67,18 @@ Responde en máximo 2 líneas:
 2. Da una recomendación clara y práctica para mejorar el próximo mes
 
 Sé directo, profesional y útil.
-
-Ejemplo:
-"En abril llevas gastos de 200k frente a ingresos de 300k, tienes un superávit de 100k. Vas bien, pero podrías aumentar tu ahorro reduciendo gastos innecesarios."
+Importante no pongas asteriscos ni emojis, solo texto claro y directo.
 """;
 
     try {
       final response = await http
           .post(
-            url,
+            Uri.parse(baseUrl),
             headers: {
               "Content-Type": "application/json",
-              "Authorization": "Bearer $apiKey",
             },
             body: jsonEncode({
-              "model": "deepseek-chat",
-              "messages": [
-                {
-                  "role": "system",
-                  "content": "Eres un asesor financiero experto."
-                },
-                {"role": "user", "content": prompt}
-              ]
+              "message": prompt,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -89,7 +96,9 @@ Ejemplo:
     }
   }
 
-  // 🔥 Helper para nombre del mes
+  /// ==============================
+  /// 📅 Helper mes
+  /// ==============================
   String _getNombreMes(int mes) {
     const meses = [
       "Enero",
