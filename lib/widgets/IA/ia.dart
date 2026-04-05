@@ -7,7 +7,8 @@ import '../../services/DeepSeek_IA.dart';
 import '../../services/notificationIA.dart';
 
 // ─── COLORES (misma paleta del proyecto) ─────────────────────────────────────
-const _kDark = Color(0xFF1A1A2E);
+const _kDark = Color.fromARGB(255, 8, 188, 38);
+const kBlack = Color(0xFF000000);
 const _kBg = Color(0xFFF5F6FA);
 const _kCard = Colors.white;
 const _kGrey = Color(0xFF9098A9);
@@ -29,32 +30,16 @@ class IAInsightButton extends StatefulWidget {
   State<IAInsightButton> createState() => _IAInsightButtonState();
 }
 
-class _IAInsightButtonState extends State<IAInsightButton>
-    with SingleTickerProviderStateMixin {
+class _IAInsightButtonState extends State<IAInsightButton> {
   final ai = DeepSeekService();
   final noti = NotificationService();
 
   bool loading = false;
-  late AnimationController _pulseCtrl;
-  late Animation<double> _pulseAnim;
 
   @override
   void initState() {
     super.initState();
     noti.init();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 1.0, end: 1.06).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    super.dispose();
   }
 
   String _formatMoney(double value) =>
@@ -121,7 +106,7 @@ class _IAInsightButtonState extends State<IAInsightButton>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: _kDark,
+            backgroundColor: kBlack,
             behavior: SnackBarBehavior.floating,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -158,222 +143,258 @@ class _IAInsightButtonState extends State<IAInsightButton>
     showDialog(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Container(
-            decoration: BoxDecoration(
-              color: _kCard,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ── Header con gradiente ────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF1A1A2E), Color(0xFF2D2B55)],
+      builder: (dialogCtx) {
+        final isMobile = MediaQuery.of(context).size.width < 600;
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 20,
+            vertical: 24,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              decoration: BoxDecoration(
+                color: _kCard,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Header ────────────────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF1A1A2E), Color(0xFF2D2B55)],
+                      ),
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(24)),
                     ),
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.auto_awesome_rounded,
-                            color: Colors.white, size: 22),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Análisis financiero',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _nombreMes(mes),
-                              style: const TextStyle(
-                                  color: Colors.white60, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(_),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.close_rounded,
-                              size: 16, color: Colors.white70),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── Métricas ────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                  child: Row(
-                    children: [
-                      _metricTile(
-                        label: 'Ingresos',
-                        value: _formatMoney(ingresos),
-                        icon: Icons.arrow_downward_rounded,
-                        color: _kGreenDark,
-                        bg: _kGreenLight,
-                      ),
-                      const SizedBox(width: 10),
-                      _metricTile(
-                        label: 'Gastos',
-                        value: _formatMoney(gastos),
-                        icon: Icons.arrow_upward_rounded,
-                        color: _kRedDark,
-                        bg: _kRedLight,
-                      ),
-                      const SizedBox(width: 10),
-                      _metricTile(
-                        label: balanceLabel,
-                        value: _formatMoney(balance.abs()),
-                        icon: balanceIcon,
-                        color: balanceColor,
-                        bg: balanceBg,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── Respuesta IA ────────────────────────────────────────────
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 4,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: _kAmber,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Recomendación',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: _kDark,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
                         Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
+                          width: 44,
+                          height: 44,
                           decoration: BoxDecoration(
-                            color: _kBg,
+                            color: Colors.white.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                                color: Colors.black.withOpacity(0.07)),
                           ),
-                          child: Text(
-                            respuesta,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: _kDark,
-                              height: 1.65,
+                          child: const Icon(Icons.auto_awesome_rounded,
+                              color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Análisis financiero',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _nombreMes(mes),
+                                style: const TextStyle(
+                                    color: Colors.white60, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(dialogCtx),
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.close_rounded,
+                                size: 16, color: Colors.white70),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Métricas: columna en móvil, fila en web ───────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    child: isMobile
+                        ? Column(
+                            children: [
+                              _metricTileH(
+                                label: 'Ingresos',
+                                value: _formatMoney(ingresos),
+                                icon: Icons.arrow_downward_rounded,
+                                color: _kGreenDark,
+                                bg: _kGreenLight,
+                              ),
+                              const SizedBox(height: 8),
+                              _metricTileH(
+                                label: 'Gastos',
+                                value: _formatMoney(gastos),
+                                icon: Icons.arrow_upward_rounded,
+                                color: _kRedDark,
+                                bg: _kRedLight,
+                              ),
+                              const SizedBox(height: 8),
+                              _metricTileH(
+                                label: balanceLabel,
+                                value: _formatMoney(balance.abs()),
+                                icon: balanceIcon,
+                                color: balanceColor,
+                                bg: balanceBg,
+                              ),
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              _metricTileV(
+                                label: 'Ingresos',
+                                value: _formatMoney(ingresos),
+                                icon: Icons.arrow_downward_rounded,
+                                color: _kGreenDark,
+                                bg: _kGreenLight,
+                              ),
+                              const SizedBox(width: 10),
+                              _metricTileV(
+                                label: 'Gastos',
+                                value: _formatMoney(gastos),
+                                icon: Icons.arrow_upward_rounded,
+                                color: _kRedDark,
+                                bg: _kRedLight,
+                              ),
+                              const SizedBox(width: 10),
+                              _metricTileV(
+                                label: balanceLabel,
+                                value: _formatMoney(balance.abs()),
+                                icon: balanceIcon,
+                                color: balanceColor,
+                                bg: balanceBg,
+                              ),
+                            ],
+                          ),
+                  ),
+
+                  // ── Respuesta IA ─────────────────────────────────────────
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 4,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: _kAmber,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Recomendación',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: kBlack,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: _kBg,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: Colors.black.withOpacity(0.07)),
+                            ),
+                            child: Text(
+                              respuesta,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: kBlack,
+                                height: 1.65,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ── Footer ───────────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _kAmberLight,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded,
+                                  size: 12, color: _kAmberDark),
+                              SizedBox(width: 5),
+                              Text('Generado por IA',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: _kAmberDark,
+                                      fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(dialogCtx),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 11),
+                            decoration: BoxDecoration(
+                              color: _kRed,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Cerrar',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-
-                // ── Footer ──────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _kAmberLight,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline_rounded,
-                                size: 12, color: _kAmberDark),
-                            const SizedBox(width: 5),
-                            const Text('Generado por IA',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: _kAmberDark,
-                                    fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(_),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 11),
-                          decoration: BoxDecoration(
-                            color: _kDark,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Text(
-                            'Cerrar',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _metricTile({
+  // ── Tile vertical — web (en fila de 3) ───────────────────────────────────
+  Widget _metricTileV({
     required String label,
     required String value,
     required IconData icon,
@@ -414,66 +435,85 @@ class _IAInsightButtonState extends State<IAInsightButton>
     );
   }
 
+  // ── Tile horizontal — móvil (apilado, ancho completo) ────────────────────
+  Widget _metricTileH({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required Color bg,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 17, color: color),
+          ),
+          const SizedBox(width: 12),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13, color: color, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w800, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Botón principal — sin animación ──────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pulseAnim,
-      builder: (_, child) => Transform.scale(
-        scale: loading ? 1.0 : _pulseAnim.value,
-        child: child,
-      ),
-      child: GestureDetector(
-        onTap: loading ? null : _analizar,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
-          decoration: BoxDecoration(
-            gradient: loading
-                ? const LinearGradient(
-                    colors: [Color(0xFF3A3A55), Color(0xFF3A3A55)])
-                : const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1A1A2E), Color(0xFF2D2B55)],
-                  ),
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: loading
-                ? []
-                : [
-                    BoxShadow(
-                      color: _kDark.withOpacity(0.25),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (loading)
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white60,
-                  ),
-                )
-              else
-                const Icon(Icons.auto_awesome_rounded,
-                    size: 17, color: Colors.white),
-              const SizedBox(width: 9),
-              Text(
-                loading ? 'Analizando...' : 'Análisis con IA',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2,
+    return GestureDetector(
+      onTap: loading ? null : _analizar,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+        decoration: BoxDecoration(
+          color: loading ? const Color(0xFF3A3A55) : _kDark,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (loading)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white60,
                 ),
+              )
+            else
+              const Icon(Icons.auto_awesome_rounded,
+                  size: 17, color: Colors.white),
+            const SizedBox(width: 9),
+            Text(
+              loading ? 'Analizando...' : 'Análisis con IA',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
