@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const functions = require("firebase-functions");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
@@ -119,3 +120,103 @@ exports.createUserByAdmin = onCall(async (request) => {
     );
   }
 });
+
+exports.sendDebtReminderEmails = functions.pubsub
+  .schedule('0 8 * * *')
+  .timeZone('America/Bogota')
+  .onRun(async (context) => {
+    console.log('🚀 Ejecutando recordatorio de deudas');
+
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    const dueDay = tomorrow.getDate();
+
+    const debtsSnapshot = await admin
+      .firestore()
+      .collectionGroup('debts')
+      .where('dia_pago', '==', dueDay)
+      .get();
+
+    const users = new Map();
+
+    for (const doc of debtsSnapshot.docs) {
+      const data = doc.data();
+      const saldoActual = Number(data.saldo_actual) || 0;
+      if (saldoActual <= 0) continue;
+
+      const cuotaMensual = Number(data.cuota_mensual) || 0;
+      const nombreDeuda = data.nombre || 'Deuda';
+      const diaPago = data.dia_pago || dueDay;
+
+      const deudaInfo = {
+        nombre: nombreDeuda,
+        cuota: cuotaMensual,
+        saldo: saldoActual,
+        diaPago,
+      };
+
+      const userDocRef = doc.ref.parent.parent;
+      if (!userDocRef) continue;
+
+      const uid = userDocRef.id;
+      const current = users.get(uid) || [];
+      current.push(deudaInfo);
+      users.set(uid, current);
+    }
+
+    let sentCount = 0;
+
+    for (const [uid, debts] of users.entries()) {
+      const userRef = admin.firestore().collection('users').doc(uid);
+      const userDoc = await userRef.get();
+
+      if (!userDoc.exists) continue;
+      const userData = userDoc.data();
+      const email = userData?.email;
+      const name = userData?.name || 'Usuario';
+
+      if (!email) continue;
+
+      const subject = 'Recordatorio: Mañana vence tu cuota de deuda';
+      const header = `Hola ${name},`; 
+      const bodyIntro =
+        'Tus próximas cuotas vencen mañana. Ponte al día para evitar retrasos e intereses.';
+      const debtRows = debts
+        .map((debt) =>
+          `<li><strong>${debt.nombre}</strong>: cuota ${debt.cuota.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}, saldo ${debt.saldo.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</li>`
+        )
+        .join('');
+
+      const html = `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2 style="color:#FFB84E;">Recordatorio de pago</h2>
+          <p>${header}</p>
+          <p>${bodyIntro}</p>
+          <p><strong>Vencimiento:</strong> mañana, día ${dueDay}</p>
+          <ul>${debtRows}</ul>
+          <p style="margin-top: 12px;">Con cada pago mantendrás tu saldo bajo control y te liberarás de deudas más rápido.</p>
+          <p>Revisa tu app para registrar tu pago.</p>
+        </div>
+      `;
+
+      try {
+        const info = await transporter.sendMail({
+          from: `"KYBO App" <${emailUser}>`,
+          to: email,
+          subject,
+          html,
+        });
+        console.log(`📧 Correo recordatorio enviado a ${email}:`, info.response);
+        sentCount += 1;
+      } catch (error) {
+        console.error(`❌ Error enviando recordatorio a ${email}:`, error);
+      }
+    }
+
+    return {
+      success: true,
+      dueDay,
+      reminders: sentCount,
+    };
+  });

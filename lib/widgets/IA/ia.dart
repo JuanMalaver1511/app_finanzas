@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -78,10 +79,35 @@ class _IAInsightButtonState extends State<IAInsightButton> {
       final balance = (data['balance'] ?? 0).toDouble();
       final mes = data['mes'] ?? DateTime.now().month;
 
+      final debtsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('debts')
+          .get();
+
+      final deudas = debtsSnapshot.docs.fold<double>(0.0, (acc, doc) {
+        final debtData = doc.data();
+        final cuota = debtData['cuota_mensual'];
+        final saldoActual = debtData['saldo_actual'];
+
+        final cuotaVal = cuota is int
+            ? cuota.toDouble()
+            : cuota is double
+                ? cuota
+                : 0.0;
+        final saldoVal = saldoActual is int
+            ? saldoActual.toDouble()
+            : saldoActual is double
+                ? saldoActual
+                : 0.0;
+
+        return saldoVal > 0 ? acc + cuotaVal : acc;
+      });
+
       final respuesta = await ai.analizarFinanzas(
         ingresos: ingresos,
         gastos: gastos,
-        deudas: 0,
+        deudas: deudas,
         balance: balance,
         mes: mes,
       );
@@ -94,6 +120,7 @@ class _IAInsightButtonState extends State<IAInsightButton> {
           ingresos: ingresos,
           gastos: gastos,
           balance: balance,
+          deudas: deudas,
           respuesta: respuesta,
         );
       } else {
@@ -131,6 +158,7 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     required double ingresos,
     required double gastos,
     required double balance,
+    required double deudas,
     required String respuesta,
   }) {
     final isPositive = balance >= 0;
@@ -139,6 +167,9 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     final balanceLabel = isPositive ? 'Superávit' : 'Déficit';
     final balanceIcon =
         isPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded;
+    final debtColor = _kRedDark;
+    final debtBg = _kRedLight;
+    final debtIcon = Icons.credit_card_rounded;
 
     showDialog(
       context: context,
@@ -254,6 +285,14 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                                 color: balanceColor,
                                 bg: balanceBg,
                               ),
+                              const SizedBox(height: 8),
+                              _metricTileH(
+                                label: 'Deudas',
+                                value: _formatMoney(deudas),
+                                icon: debtIcon,
+                                color: debtColor,
+                                bg: debtBg,
+                              ),
                             ],
                           )
                         : Row(
@@ -280,6 +319,14 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                                 icon: balanceIcon,
                                 color: balanceColor,
                                 bg: balanceBg,
+                              ),
+                              const SizedBox(width: 10),
+                              _metricTileV(
+                                label: 'Deudas',
+                                value: _formatMoney(deudas),
+                                icon: debtIcon,
+                                color: debtColor,
+                                bg: debtBg,
                               ),
                             ],
                           ),
