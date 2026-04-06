@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
+import '../../../models/transaction_model.dart';
+import '../../../services/transaction_service.dart';
 
 // ─── COLORES ─────────────────────────────────────────────────────────────────
 const kAmber = Color(0xFFFFBB4E);
@@ -174,6 +176,7 @@ class _DeudasScreenState extends State<DeudasScreen>
   String _filtroTipo = 'todos';
   String _ordenarPor = 'nombre';
   int? _expandedIndex;
+  bool _alertaMostrada = false;
 
   CollectionReference get _debtsRef => FirebaseFirestore.instance
       .collection('users')
@@ -232,6 +235,62 @@ class _DeudasScreenState extends State<DeudasScreen>
         lista.sort((a, b) => a.nombre.compareTo(b.nombre));
     }
     return lista;
+  }
+
+  // ─── MOSTRAR ALERTA DE DEUDAS VENCIDAS ─────────────────────────────────────
+  void _mostrarAlertaDeudas(List<Debt> allDebts) {
+    if (_alertaMostrada || allDebts.isEmpty) return;
+
+    _alertaMostrada = true;
+
+    final deudosVencidas = allDebts.where((d) => d.estaVencida).toList();
+    final proximoCuota = allDebts.isEmpty
+        ? null
+        : allDebts.reduce((a, b) => a.diaPago < b.diaPago ? a : b);
+
+    if (deudosVencidas.isNotEmpty) {
+      // 🔴 Hay deudas vencidas
+      final deuda = deudosVencidas.first;
+      final mensaje =
+          '⚠️ Esta cuota está vencida\n${deuda.nombre} - ${fmt(deuda.cuotaMensual)}';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mensaje,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white)),
+          backgroundColor: kRed,
+          duration: const Duration(seconds: 10),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    } else if (proximoCuota != null) {
+      // 🟡 Sin vencidas, pero hay próxima cuota
+      final diasFalta = proximoCuota.diaPago - DateTime.now().day;
+      final mensaje =
+          '📅 Próxima cuota: ${proximoCuota.nombre}\nDía ${proximoCuota.diaPago}: ${fmt(proximoCuota.cuotaMensual)}';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mensaje,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white)),
+          backgroundColor: kAmber,
+          duration: const Duration(seconds: 10),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -319,6 +378,21 @@ class _DeudasScreenState extends State<DeudasScreen>
               style: TextStyle(
                   fontWeight: FontWeight.w700, fontSize: 20, color: kDark)),
           const Spacer(),
+          GestureDetector(
+            onTap: _showDebtHelpDialog,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: kCard,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: const Icon(Icons.help_outline_rounded,
+                  size: 18, color: kDark),
+            ),
+          ),
+          if (isWide) const SizedBox(width: 8),
           if (isWide)
             GestureDetector(
               onTap: () => _showAddDebt(),
@@ -405,6 +479,11 @@ class _DeudasScreenState extends State<DeudasScreen>
         }
         final all = snap.data!.docs.map((e) => Debt.fromDoc(e)).toList();
         final debts = _filtrarOrdenar(all);
+
+        // 🔔 Mostrar alerta una sola vez
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _mostrarAlertaDeudas(all);
+        });
 
         return ListView(
           padding: EdgeInsets.zero,
@@ -531,22 +610,26 @@ class _DeudasScreenState extends State<DeudasScreen>
                             size: 18, color: kAmberDark),
                       ),
                       const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Interés prom.',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: kAmberDark,
-                                  fontWeight: FontWeight.w500)),
-                          Text(
-                            '${avgInteres.toStringAsFixed(1)}% EA',
-                            style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: kAmberDark),
-                          ),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Interés prom.',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: kAmberDark,
+                                    fontWeight: FontWeight.w500)),
+                            Text(
+                              '${avgInteres.toStringAsFixed(1)}% EA',
+                              style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: kAmberDark),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -600,7 +683,7 @@ class _DeudasScreenState extends State<DeudasScreen>
                                 ? '$vencidas deuda${vencidas > 1 ? 's' : ''}'
                                 : 'Sin vencidas',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.w800,
                               color: vencidas > 0 ? kRedDark : kGreenDark,
                             ),
@@ -729,98 +812,255 @@ class _DeudasScreenState extends State<DeudasScreen>
       );
     }
 
-    // ─── Versión móvil: scroll horizontal ────────────────────────────────
+    // ─── Versión móvil: botón modal compacto ────────────────────────────
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 38,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            children: tipos.map((t) {
-              final sel = _filtroTipo == t.$1;
-              return GestureDetector(
-                onTap: () => setState(() {
-                  _filtroTipo = t.$1;
-                  _expandedIndex = null;
-                }),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.only(right: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: sel ? kDark : kCard,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: sel ? kDark : Colors.black.withOpacity(0.1)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(t.$3, size: 13, color: sel ? Colors.white : kGrey),
-                      const SizedBox(width: 5),
-                      Text(t.$2,
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight:
-                                  sel ? FontWeight.w600 : FontWeight.w400,
-                              color: sel ? Colors.white : kGrey)),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 32,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            children: ordenes.map((o) {
-              final sel = _ordenarPor == o.$1;
-              return GestureDetector(
-                onTap: () => setState(() {
-                  _ordenarPor = o.$1;
-                  _expandedIndex = null;
-                }),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.only(right: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: sel ? kAmberLight : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: sel
-                            ? kAmber.withOpacity(0.5)
-                            : Colors.black.withOpacity(0.09)),
-                  ),
-                  child: Row(
-                    children: [
-                      if (sel)
-                        const Icon(Icons.sort_rounded,
-                            size: 12, color: kAmberDark),
-                      if (sel) const SizedBox(width: 4),
-                      Text(o.$2,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight:
-                                  sel ? FontWeight.w600 : FontWeight.w400,
-                              color: sel ? kAmberDark : kGrey)),
-                    ],
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _showFiltrosModal(tipos, ordenes),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: kCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.black.withOpacity(0.1)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Filtros activos',
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      color: kGrey,
+                                      fontWeight: FontWeight.w500)),
+                              const SizedBox(height: 2),
+                              Text(
+                                  _filtroTipo == 'todos'
+                                      ? 'Todos'
+                                      : _tipoLabel(_filtroTipo),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: kDark,
+                                      fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: kAmberLight,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _getOrdenLabel(),
+                            style: const TextStyle(
+                                fontSize: 10,
+                                color: kAmberDark,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.tune_rounded, size: 18, color: kGrey),
+                      ],
+                    ),
                   ),
                 ),
-              );
-            }).toList(),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
       ],
+    );
+  }
+
+  // ─── Helper para obtener label de ordenamiento ─────────────────────────
+  String _getOrdenLabel() {
+    const m = {
+      'nombre': 'A–Z',
+      'saldo': 'Mayor saldo',
+      'cuota': 'Mayor cuota',
+      'interes': 'Mayor interés',
+      'progreso': 'Más avanzada',
+    };
+    return m[_ordenarPor] ?? 'A–Z';
+  }
+
+  // ─── Modal de filtros para móvil ──────────────────────────────────────
+  void _showFiltrosModal(
+      List<(String, String, IconData)> tipos, List<(String, String)> ordenes) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (modalContext) => Container(
+        decoration: const BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                children: [
+                  const Text('Filtros y orden',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: kDark)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(modalContext),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: kBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.close_rounded,
+                          size: 16, color: kGrey),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(
+              height: 1,
+              color: Colors.black.withOpacity(0.06),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Tipo de deuda',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: kGrey,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: tipos.map((t) {
+                        final sel = _filtroTipo == t.$1;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _filtroTipo = t.$1;
+                              _expandedIndex = null;
+                            });
+                            Navigator.pop(modalContext);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: sel ? kDark : kBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color:
+                                    sel ? kDark : Colors.black.withOpacity(0.1),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(t.$3,
+                                    size: 14,
+                                    color: sel ? Colors.white : kGrey),
+                                const SizedBox(width: 6),
+                                Text(t.$2,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: sel
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: sel ? Colors.white : kGrey,
+                                    )),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('Ordenar por',
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: kGrey,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5)),
+                    const SizedBox(height: 10),
+                    Column(
+                      children: ordenes.map((o) {
+                        final sel = _ordenarPor == o.$1;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _ordenarPor = o.$1;
+                              _expandedIndex = null;
+                            });
+                            Navigator.pop(modalContext);
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 11),
+                            decoration: BoxDecoration(
+                              color: sel ? kAmberLight : kBg,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: sel
+                                    ? kAmber.withOpacity(0.5)
+                                    : Colors.black.withOpacity(0.09),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                if (sel)
+                                  const Icon(Icons.check_rounded,
+                                      size: 16, color: kAmberDark),
+                                if (sel) const SizedBox(width: 8),
+                                Text(o.$2,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: sel
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                      color: sel ? kAmberDark : kGrey,
+                                    )),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1019,36 +1259,45 @@ class _DeudasScreenState extends State<DeudasScreen>
           ),
           const SizedBox(height: 12),
           // Botones de acción — fila de 4
-          Row(
-            children: [
-              _actionBtn2(
-                  label: 'Pagar',
-                  icon: Icons.check_rounded,
-                  color: kGreen,
-                  bg: kGreenLight,
-                  onTap: () => _showPagoModal(d)),
-              const SizedBox(width: 8),
-              _actionBtn2(
-                  label: 'Editar',
-                  icon: Icons.edit_rounded,
-                  color: kBlue,
-                  bg: kBlueLight,
-                  onTap: () => _showEditarDeuda(d)),
-              const SizedBox(width: 8),
-              _actionBtn2(
-                  label: 'Simular',
-                  icon: Icons.bolt_rounded,
-                  color: kAmberDark,
-                  bg: kAmberLight,
-                  onTap: () => _showSimulador(d)),
-              const SizedBox(width: 8),
-              _actionBtn2(
-                  label: 'Eliminar',
-                  icon: Icons.delete_rounded,
-                  color: kRed,
-                  bg: kRedLight,
-                  onTap: () => _confirmDelete(d)),
-            ],
+          StatefulBuilder(
+            builder: (context, setBtnState) {
+              bool isDeleting = false;
+              return Row(
+                children: [
+                  _actionBtn2(
+                      label: 'Pagar',
+                      icon: Icons.check_rounded,
+                      color: kGreen,
+                      bg: kGreenLight,
+                      onTap: () => _showPagoModal(d)),
+                  const SizedBox(width: 8),
+                  _actionBtn2(
+                      label: 'Editar',
+                      icon: Icons.edit_rounded,
+                      color: kBlue,
+                      bg: kBlueLight,
+                      onTap: () => _showEditarDeuda(d)),
+                  const SizedBox(width: 8),
+                  _actionBtn2(
+                      label: 'Simular',
+                      icon: Icons.bolt_rounded,
+                      color: kAmberDark,
+                      bg: kAmberLight,
+                      onTap: () => _showSimulador(d)),
+                  const SizedBox(width: 8),
+                  _actionBtn2(
+                      label: 'Eliminar',
+                      icon: Icons.delete_rounded,
+                      color: kRed,
+                      bg: kRedLight,
+                      onTap: () => _confirmDelete(
+                          d,
+                          () => setBtnState(() => isDeleting = true),
+                          () => setBtnState(() => isDeleting = false)),
+                      isLoading: isDeleting),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -1096,23 +1345,35 @@ class _DeudasScreenState extends State<DeudasScreen>
     required Color color,
     required Color bg,
     required VoidCallback onTap,
+    bool isLoading = false,
   }) {
     return Expanded(
       child: GestureDetector(
-        onTap: onTap,
+        onTap: isLoading ? null : onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: bg,
+            color: isLoading ? bg.withOpacity(0.6) : bg,
             borderRadius: BorderRadius.circular(11),
           ),
           child: Column(
             children: [
-              Icon(icon, size: 16, color: color),
+              isLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(color),
+                      ),
+                    )
+                  : Icon(icon, size: 16, color: color),
               const SizedBox(height: 3),
               Text(label,
                   style: TextStyle(
-                      fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+                      fontSize: 10,
+                      color: isLoading ? color.withOpacity(0.6) : color,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -1476,8 +1737,36 @@ class _DeudasScreenState extends State<DeudasScreen>
     final saldo = TextEditingController();
     final cuota = TextEditingController();
     final interes = TextEditingController(text: '0');
+    final numCuotasCtrl = TextEditingController(text: '12');
     String tipo = 'personal';
     int diaPago = 1;
+    bool isLoading = false;
+
+    // Función para calcular cuota mensual con interés
+    void _calcularCuota() {
+      final montoVal = double.tryParse(monto.text) ?? 0;
+      final interesVal = double.tryParse(interes.text) ?? 0;
+      final numCuotasVal = int.tryParse(numCuotasCtrl.text) ?? 12;
+
+      if (montoVal <= 0 || numCuotasVal <= 0) {
+        cuota.clear();
+        return;
+      }
+
+      if (interesVal == 0) {
+        // Sin interés: cuota simple
+        final cuotaSimple = montoVal / numCuotasVal;
+        cuota.text = cuotaSimple.toStringAsFixed(0);
+      } else {
+        // Con interés: fórmula de amortización
+        final tasaMensual = (interesVal / 100) / 12;
+        final numerador =
+            montoVal * tasaMensual * pow(1 + tasaMensual, numCuotasVal);
+        final denominador = pow(1 + tasaMensual, numCuotasVal) - 1;
+        final cuotaConInteres = numerador / denominador;
+        cuota.text = cuotaConInteres.toStringAsFixed(0);
+      }
+    }
 
     showDialog(
       context: context,
@@ -1486,75 +1775,152 @@ class _DeudasScreenState extends State<DeudasScreen>
         builder: (ctx, setM) => _centeredDialog(
           title: 'Nueva deuda',
           icon: Icons.add_card_rounded,
-          child: Column(
-            children: [
-              _field('Nombre de la deuda', nombre,
-                  hint: 'Ej: Tarjeta Bancolombia'),
-              const SizedBox(height: 14),
-              Row(children: [
-                Expanded(
-                    child: _dropdownField(
-                        'Tipo',
-                        tipo,
-                        ['personal', 'tarjeta', 'hipoteca', 'vehiculo'],
-                        ['Personal', 'Tarjeta', 'Hipoteca', 'Vehículo'],
-                        (v) => setM(() => tipo = v ?? 'personal'))),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _dropdownIntField(
-                        'Día de pago',
-                        diaPago,
-                        List.generate(28, (i) => i + 1),
-                        List.generate(28, (i) => 'Día ${i + 1}'),
-                        (v) => setM(() => diaPago = v ?? 1))),
-              ]),
-              const SizedBox(height: 14),
-              Row(children: [
-                Expanded(
-                    child: _field('Monto total', monto,
-                        hint: '0', isNumber: true)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _field('Saldo actual', saldo,
-                        hint: '0', isNumber: true)),
-              ]),
-              const SizedBox(height: 14),
-              Row(children: [
-                Expanded(
-                    child: _field('Cuota mensual', cuota,
-                        hint: '0', isNumber: true)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _field('Interés anual %', interes,
-                        hint: '0', isNumber: true)),
-              ]),
-              const SizedBox(height: 22),
-              Row(children: [
-                Expanded(child: _cancelBtn(() => Navigator.pop(context))),
-                const SizedBox(width: 10),
-                Expanded(
-                  flex: 2,
-                  child: _submitBtn('Guardar deuda', () async {
-                    final n = nombre.text.trim();
-                    final m = double.tryParse(monto.text) ?? 0;
-                    final s = double.tryParse(saldo.text) ?? m;
-                    final c = double.tryParse(cuota.text) ?? 0;
-                    final ii = double.tryParse(interes.text) ?? 0;
-                    if (n.isEmpty || m <= 0) return;
-                    await _debtsRef.add({
-                      'nombre': n,
-                      'tipo': tipo,
-                      'monto_total': m,
-                      'saldo_actual': s,
-                      'cuota_mensual': c,
-                      'dia_pago': diaPago,
-                      'interes': ii,
-                    });
-                    if (context.mounted) Navigator.pop(context);
-                  }),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _field('Nombre de la deuda', nombre,
+                    hint: 'Ej: Tarjeta Bancolombia'),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                      child: _dropdownField(
+                          'Tipo',
+                          tipo,
+                          ['personal', 'tarjeta', 'hipoteca', 'vehiculo'],
+                          ['Personal', 'Tarjeta', 'Hipoteca', 'Vehículo'],
+                          (v) => setM(() => tipo = v ?? 'personal'))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _dropdownIntField(
+                          'Día pago',
+                          diaPago,
+                          List.generate(28, (i) => i + 1),
+                          List.generate(28, (i) => '${i + 1}'),
+                          (v) => setM(() => diaPago = v ?? 1))),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                      child: _field('Monto total', monto,
+                          hint: '0',
+                          isNumber: true,
+                          onChanged: (_) => setM(_calcularCuota))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _field('Saldo actual', saldo,
+                          hint: '0', isNumber: true)),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                      child: _field('Cuotas', numCuotasCtrl,
+                          hint: '12',
+                          isNumber: true,
+                          onChanged: (_) => setM(_calcularCuota))),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: _field('Interés % EA', interes,
+                          hint: '0',
+                          isNumber: true,
+                          onChanged: (_) => setM(_calcularCuota))),
+                ]),
+                const SizedBox(height: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: kGreenLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: kGreen.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calculate_rounded,
+                          color: kGreen, size: 16),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Cuota calculada',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: kGreenDark,
+                                  fontWeight: FontWeight.w500)),
+                          Text(
+                            cuota.text.isEmpty ? '\$0' : '\$${cuota.text}',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: kGreenDark),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setM(() => cuota.clear()),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: kGreen.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text('Editar',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: kGreenDark,
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ]),
-            ],
+                const SizedBox(height: 8),
+                _field('Cuota mensual', cuota, hint: '0', isNumber: true),
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(child: _cancelBtn(() {
+                    Navigator.pop(context);
+                  })),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: _submitBtn('Guardar deuda', () async {
+                      if (isLoading) return;
+                      setM(() => isLoading = true);
+                      try {
+                        final n = nombre.text.trim();
+                        final m = double.tryParse(monto.text) ?? 0;
+                        final s = double.tryParse(saldo.text) ?? m;
+                        final c = double.tryParse(cuota.text) ?? 0;
+                        final ii = double.tryParse(interes.text) ?? 0;
+                        if (n.isEmpty || m <= 0) {
+                          setM(() => isLoading = false);
+                          return;
+                        }
+                        await _debtsRef.add({
+                          'nombre': n,
+                          'tipo': tipo,
+                          'monto_total': m,
+                          'saldo_actual': s,
+                          'cuota_mensual': c,
+                          'dia_pago': diaPago,
+                          'interes': ii,
+                        });
+                        if (context.mounted) Navigator.pop(context);
+                      } catch (e) {
+                        setM(() => isLoading = false);
+                      }
+                    }, isLoading: isLoading),
+                  ),
+                ]),
+              ],
+            ),
           ),
         ),
       ),
@@ -1570,6 +1936,7 @@ class _DeudasScreenState extends State<DeudasScreen>
     final interes = TextEditingController(text: d.interes.toStringAsFixed(1));
     String tipo = d.tipo;
     int diaPago = d.diaPago;
+    bool isLoading = false;
 
     showDialog(
       context: context,
@@ -1620,20 +1987,26 @@ class _DeudasScreenState extends State<DeudasScreen>
                 Expanded(
                   flex: 2,
                   child: _submitBtn('Guardar cambios', () async {
-                    await _debtsRef.doc(d.id).update({
-                      'nombre': nombre.text.trim(),
-                      'tipo': tipo,
-                      'monto_total':
-                          double.tryParse(monto.text) ?? d.montoTotal,
-                      'saldo_actual':
-                          double.tryParse(saldo.text) ?? d.saldoActual,
-                      'cuota_mensual':
-                          double.tryParse(cuota.text) ?? d.cuotaMensual,
-                      'dia_pago': diaPago,
-                      'interes': double.tryParse(interes.text) ?? d.interes,
-                    });
-                    if (context.mounted) Navigator.pop(context);
-                  }),
+                    if (isLoading) return;
+                    setM(() => isLoading = true);
+                    try {
+                      await _debtsRef.doc(d.id).update({
+                        'nombre': nombre.text.trim(),
+                        'tipo': tipo,
+                        'monto_total':
+                            double.tryParse(monto.text) ?? d.montoTotal,
+                        'saldo_actual':
+                            double.tryParse(saldo.text) ?? d.saldoActual,
+                        'cuota_mensual':
+                            double.tryParse(cuota.text) ?? d.cuotaMensual,
+                        'dia_pago': diaPago,
+                        'interes': double.tryParse(interes.text) ?? d.interes,
+                      });
+                      if (context.mounted) Navigator.pop(context);
+                    } catch (e) {
+                      setM(() => isLoading = false);
+                    }
+                  }, isLoading: isLoading),
                 ),
               ]),
             ],
@@ -1646,6 +2019,7 @@ class _DeudasScreenState extends State<DeudasScreen>
   void _showPagoModal(Debt d) {
     final montoCtrl =
         TextEditingController(text: d.cuotaMensual.toStringAsFixed(0));
+    bool isLoading = false;
 
     showDialog(
       context: context,
@@ -1697,26 +2071,58 @@ class _DeudasScreenState extends State<DeudasScreen>
               ]),
               const SizedBox(height: 22),
               Row(children: [
-                Expanded(child: _cancelBtn(() => Navigator.pop(context))),
+                Expanded(child: _cancelBtn(() {
+                  Navigator.pop(context);
+                })),
                 const SizedBox(width: 10),
                 Expanded(
                   flex: 2,
                   child: _submitBtn('Confirmar pago', () async {
-                    final pago = double.tryParse(montoCtrl.text) ?? 0;
-                    if (pago <= 0) return;
-                    final nuevoSaldo =
-                        (d.saldoActual - pago).clamp(0, double.infinity);
-                    await _debtsRef
-                        .doc(d.id)
-                        .update({'saldo_actual': nuevoSaldo});
-                    await _pagosRef.add({
-                      'deuda_id': d.id,
-                      'deuda_nombre': d.nombre,
-                      'monto': pago,
-                      'fecha': Timestamp.now(),
-                    });
-                    if (context.mounted) Navigator.pop(context);
-                  }, color: kGreen),
+                    if (isLoading) return;
+                    setM(() => isLoading = true);
+                    try {
+                      final pago = double.tryParse(montoCtrl.text) ?? 0;
+                      if (pago <= 0) {
+                        setM(() => isLoading = false);
+                        return;
+                      }
+                      final nuevoSaldo =
+                          (d.saldoActual - pago).clamp(0, double.infinity);
+
+                      // Actualizar deuda
+                      await _debtsRef
+                          .doc(d.id)
+                          .update({'saldo_actual': nuevoSaldo});
+
+                      // Registrar pago en colección
+                      await _pagosRef.add({
+                        'deuda_id': d.id,
+                        'deuda_nombre': d.nombre,
+                        'monto': pago,
+                        'fecha': Timestamp.now(),
+                      });
+
+                      // 🔗 Crear transacción para que aparezca en dashboard
+                      if (user != null) {
+                        final transactionService =
+                            TransactionService(user!.uid);
+                        final transaction = AppTransaction(
+                          id: '', // Se genera en Firestore
+                          title: 'Pago deuda - ${d.nombre}',
+                          category: 'Pago de deudas',
+                          amount: pago,
+                          isIncome: false, // Es un gasto
+                          date: DateTime.now(),
+                          emoji: '💳',
+                        );
+                        await transactionService.add(transaction);
+                      }
+
+                      if (context.mounted) Navigator.pop(context);
+                    } catch (e) {
+                      setM(() => isLoading = false);
+                    }
+                  }, color: kGreen, isLoading: isLoading),
                 ),
               ]),
             ],
@@ -1819,11 +2225,171 @@ class _DeudasScreenState extends State<DeudasScreen>
                   ),
                 ),
                 const SizedBox(height: 22),
-                _cancelBtn(() => Navigator.pop(context), label: 'Cerrar'),
+                _cancelBtn(() => Navigator.pop(ctx), label: 'Cerrar'),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _showDebtHelpDialog() async {
+    await showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: kCard,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: kAmber.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.help_outline_rounded,
+                        color: kAmber,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Cómo usar el módulo de deudas',
+                        style: TextStyle(
+                          color: kDark,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _helpItem(
+                  icon: Icons.add_rounded,
+                  title: 'Registra tus deudas',
+                  description:
+                      'Crea cada deuda con nombre, tipo, monto original, saldo actual, cuota mensual e interés anual.',
+                ),
+                _helpItem(
+                  icon: Icons.payment_rounded,
+                  title: 'Paga cuotas según corresponda',
+                  description:
+                      'Registra pagos para disminuir el saldo y generar el historial en movimientos.',
+                ),
+                _helpItem(
+                  icon: Icons.filter_alt_rounded,
+                  title: 'Usa filtros y ordena',
+                  description:
+                      'Filtra por tipo y ordena por saldo, cuota, interés o progreso para encontrar lo que necesitas.',
+                ),
+                _helpItem(
+                  icon: Icons.timeline_rounded,
+                  title: 'Revisa el estado de cada deuda',
+                  description:
+                      'Observa avances, cuotas restantes y deudas vencidas para mantener el control.',
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: kBg,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    'Consejo: Mantén actualizadas tus cuotas para ver el impacto real en tu saldo disponible.',
+                    style: TextStyle(
+                      color: kDark,
+                      fontSize: 13,
+                      height: 1.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kAmber,
+                      foregroundColor: kDark,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _helpItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: kAmber.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: kAmber),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        color: kDark,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text(description,
+                    style: const TextStyle(
+                        color: kGrey, fontSize: 13, height: 1.5)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1848,59 +2414,101 @@ class _DeudasScreenState extends State<DeudasScreen>
     );
   }
 
-  void _confirmDelete(Debt d) {
+  void _confirmDelete(Debt d,
+      [VoidCallback? onLoadingStart, VoidCallback? onLoadingEnd]) {
     showDialog(
       context: context,
       barrierColor: Colors.black54,
-      builder: (_) => AlertDialog(
-        backgroundColor: kCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Eliminar deuda',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration:
-                  BoxDecoration(color: kRedLight, shape: BoxShape.circle),
-              child: const Icon(Icons.delete_forever_rounded,
-                  color: kRedDark, size: 26),
+      barrierDismissible: false, // No se puede cerrar haciendo clic fuera
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setM) {
+          bool isLoading = false;
+          return WillPopScope(
+            onWillPop: () async => !isLoading, // No se puede cerrar con back
+            child: AlertDialog(
+              backgroundColor: kCard,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              title: const Text('Eliminar deuda',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration:
+                        BoxDecoration(color: kRedLight, shape: BoxShape.circle),
+                    child: const Icon(Icons.delete_forever_rounded,
+                        color: kRedDark, size: 26),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '¿Eliminar "${d.nombre}"?\nEsta acción no se puede deshacer.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: kGrey, fontSize: 14, height: 1.5),
+                  ),
+                ],
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                TextButton(
+                  onPressed: isLoading ? null : () => Navigator.pop(ctx),
+                  child: Text('Cancelar',
+                      style: TextStyle(
+                          color: isLoading ? kGrey.withOpacity(0.3) : kGrey,
+                          fontWeight: FontWeight.w500)),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: isLoading ? kRed.withOpacity(0.6) : kRed,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12))),
+                  onPressed: isLoading
+                      ? null
+                      : () async {
+                          setM(() => isLoading = true);
+                          onLoadingStart?.call();
+                          try {
+                            await _debtsRef.doc(d.id).delete();
+                            // Pequeño delay para mostrar el spinner un poco más
+                            await Future.delayed(
+                                const Duration(milliseconds: 500));
+                            if (ctx.mounted) {
+                              setState(() => _expandedIndex = null);
+                              Navigator.pop(ctx);
+                            }
+                          } catch (e) {
+                            setM(() => isLoading = false);
+                            onLoadingEnd?.call();
+                          } finally {
+                            // Asegurar que el estado se resetee si algo sale mal
+                            if (ctx.mounted && isLoading) {
+                              setM(() => isLoading = false);
+                              onLoadingEnd?.call();
+                            }
+                          }
+                        },
+                  child: isLoading
+                      ? Container(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor:
+                                const AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Text('Eliminar'),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            Text(
-              '¿Eliminar "${d.nombre}"?\nEsta acción no se puede deshacer.',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: kGrey, fontSize: 14, height: 1.5),
-            ),
-          ],
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar',
-                style: TextStyle(color: kGrey, fontWeight: FontWeight.w500)),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: kRed,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12))),
-            onPressed: () async {
-              await _debtsRef.doc(d.id).delete();
-              if (context.mounted) {
-                setState(() => _expandedIndex = null);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Eliminar'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -2069,22 +2677,32 @@ class _DeudasScreenState extends State<DeudasScreen>
         ),
       );
 
-  Widget _submitBtn(String label, VoidCallback onTap, {Color color = kDark}) {
+  Widget _submitBtn(String label, VoidCallback onTap,
+      {Color color = kDark, bool isLoading = false}) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: isLoading ? null : onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: color,
+          color: isLoading ? color.withOpacity(0.6) : color,
           borderRadius: BorderRadius.circular(13),
         ),
         child: Center(
-          child: Text(label,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600)),
+          child: isLoading
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: const AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+              : Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
         ),
       ),
     );
