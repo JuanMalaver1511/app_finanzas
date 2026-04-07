@@ -96,23 +96,37 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   bool get _hasFinancialProfile {
     if (_financeProfile == null) return false;
     return _financeProfile!['financialProfileCompleted'] == true &&
-        ((_financeProfile!['monthlyIncome'] as num?)?.toDouble() ?? 0) > 0;
+        _monthlyIncome > 0;
   }
 
   double get _monthlyIncome {
-    return (_financeProfile?['monthlyIncome'] as num?)?.toDouble() ?? 0;
+    return (_financeProfile?['baseMonthlyIncome'] as num?)?.toDouble() ??
+        (_financeProfile?['monthlyIncome'] as num?)?.toDouble() ??
+        0;
   }
 
-  String get _incomeType {
-    return (_financeProfile?['incomeType'] ?? 'fixed').toString();
+  String get _incomeFrequency {
+    return (_financeProfile?['incomeFrequency'] ?? 'monthly').toString();
   }
 
-  int? get _payday {
-    final value = _financeProfile?['payday'];
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    return int.tryParse(value.toString());
+  List<int> get _paymentDays {
+    final raw = _financeProfile?['paymentDays'];
+
+    if (raw is List) {
+      return raw
+          .map((e) => e is int ? e : int.tryParse(e.toString()))
+          .whereType<int>()
+          .where((e) => e >= 1 && e <= 31)
+          .toList()
+        ..sort();
+    }
+
+    // compatibilidad con datos viejos
+    final oldPayday = _financeProfile?['payday'];
+    if (oldPayday is int) return [oldPayday];
+    if (oldPayday is num) return [oldPayday.toInt()];
+
+    return [];
   }
 
   String _normalizeCategory(String value) {
@@ -703,9 +717,9 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   }
 
   Future<void> _saveFinancialProfile({
-    required double monthlyIncome,
-    required String incomeType,
-    int? payday,
+    required double baseMonthlyIncome,
+    required String incomeFrequency,
+    required List<int> paymentDays,
   }) async {
     await FirebaseFirestore.instance
         .collection('users')
@@ -713,17 +727,18 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         .collection('settings')
         .doc('finance')
         .set({
-      'monthlyIncome': monthlyIncome,
-      'incomeType': incomeType,
-      'payday': payday,
+      'baseMonthlyIncome': baseMonthlyIncome,
+      'incomeFrequency': incomeFrequency,
+      'paymentDays': paymentDays,
       'financialProfileCompleted': true,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     _financeProfile = {
-      'monthlyIncome': monthlyIncome,
-      'incomeType': incomeType,
-      'payday': payday,
+      ...?_financeProfile,
+      'baseMonthlyIncome': baseMonthlyIncome,
+      'incomeFrequency': incomeFrequency,
+      'paymentDays': paymentDays,
       'financialProfileCompleted': true,
     };
 
@@ -736,11 +751,16 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     final incomeController = TextEditingController(
       text: _monthlyIncome > 0 ? _monthlyIncome.toStringAsFixed(0) : '',
     );
-    final paydayController = TextEditingController(
-      text: _payday != null ? _payday.toString() : '',
+
+    final firstPaydayController = TextEditingController(
+      text: _paymentDays.isNotEmpty ? _paymentDays.first.toString() : '',
     );
 
-    String selectedIncomeType = _incomeType;
+    final secondPaydayController = TextEditingController(
+      text: _paymentDays.length > 1 ? _paymentDays[1].toString() : '',
+    );
+
+    String selectedIncomeFrequency = _incomeFrequency;
     bool saving = false;
 
     await showDialog(
@@ -773,7 +793,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                     Text(
                       forceOpen
                           ? 'Antes de usar presupuestos, necesitamos conocer tu ingreso mensual base.'
-                          : 'Actualiza tu ingreso mensual para que los presupuestos sean más claros y útiles.',
+                          : 'Actualiza tu base mensual para que los presupuestos sean más claros y útiles.',
                       style: const TextStyle(
                         color: kGrey,
                         fontSize: 13,
@@ -787,31 +807,51 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                     children: [
                       _dialogSectionTitle('1. ¿Cómo recibes tus ingresos?'),
                       const SizedBox(height: 10),
-                      Row(
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
                         children: [
-                          Expanded(
+                          SizedBox(
+                            width: 135,
+                            height: 110,
                             child: _incomeTypeCard(
-                              title: 'Ingreso fijo',
-                              subtitle: 'Recibo casi el mismo valor cada mes',
-                              icon: Icons.payments_outlined,
-                              selected: selectedIncomeType == 'fixed',
+                              title: 'Mensual',
+                              subtitle: 'Recibo un pago al mes',
+                              icon: Icons.calendar_month_rounded,
+                              selected: selectedIncomeFrequency == 'monthly',
                               onTap: () {
                                 setLocalState(() {
-                                  selectedIncomeType = 'fixed';
+                                  selectedIncomeFrequency = 'monthly';
                                 });
                               },
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
+                          SizedBox(
+                            width: 135,
+                            height: 110,
                             child: _incomeTypeCard(
-                              title: 'Ingreso variable',
-                              subtitle: 'No siempre recibo el mismo valor',
+                              title: 'Quincenal',
+                              subtitle: 'Recibo dos pagos al mes',
+                              icon: Icons.event_repeat_rounded,
+                              selected: selectedIncomeFrequency == 'biweekly',
+                              onTap: () {
+                                setLocalState(() {
+                                  selectedIncomeFrequency = 'biweekly';
+                                });
+                              },
+                            ),
+                          ),
+                          SizedBox(
+                            width: 135,
+                            height: 110,
+                            child: _incomeTypeCard(
+                              title: 'Variable',
+                              subtitle: 'No siempre recibo igual',
                               icon: Icons.show_chart_rounded,
-                              selected: selectedIncomeType == 'variable',
+                              selected: selectedIncomeFrequency == 'variable',
                               onTap: () {
                                 setLocalState(() {
-                                  selectedIncomeType = 'variable';
+                                  selectedIncomeFrequency = 'variable';
                                 });
                               },
                             ),
@@ -820,31 +860,66 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                       ),
                       const SizedBox(height: 18),
                       _dialogSectionTitle(
-                          '2. ¿Cuál es tu ingreso mensual actual?'),
+                          '2. ¿Cuál es tu base mensual actual?'),
                       const SizedBox(height: 10),
-                      TextField(
-                        controller: incomeController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
-                        ],
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: kBackground,
-                          hintText: 'Ej: 2500000',
-                          labelText: 'Ingreso mensual',
-                          prefixIcon: const Icon(Icons.attach_money_rounded),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Base mensual',
+                            style: TextStyle(
+                              color: kGrey,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: incomeController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9]')),
+                            ],
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: kBackground,
+                              hintText: 'Ej: 2.500.000',
+                              hintStyle: const TextStyle(
+                                color: kGrey,
+                                fontSize: 14,
+                              ),
+                              prefixText: '\$ ',
+                              prefixStyle: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: kDark,
+                                fontSize: 14,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       const Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          'Este valor será la base para organizar mejor tus presupuestos.',
+                          'Este valor sirve como referencia para validar tus presupuestos.',
                           style: TextStyle(
                             color: kGrey,
                             fontSize: 12,
@@ -853,38 +928,121 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                       ),
                       const SizedBox(height: 18),
                       _dialogSectionTitle(
-                          '3. ¿Qué día sueles recibirlo? (opcional)'),
+                          '3. ¿Qué día o días sueles recibirlo?'),
                       const SizedBox(height: 10),
-                      TextField(
-                        controller: paydayController,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
-                          LengthLimitingTextInputFormatter(2),
-                        ],
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: kBackground,
-                          hintText: 'Ej: 30',
-                          labelText: 'Día de pago',
-                          prefixIcon: const Icon(Icons.calendar_today_rounded),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                      if (selectedIncomeFrequency == 'monthly') ...[
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Día de pago',
+                              style: TextStyle(
+                                color: kGrey,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: firstPaydayController,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[0-9]')),
+                                LengthLimitingTextInputFormatter(2),
+                              ],
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: kBackground,
+                                hintText: 'Ej: 30',
+                                hintStyle: const TextStyle(
+                                  color: kGrey,
+                                  fontSize: 14,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      ] else if (selectedIncomeFrequency == 'biweekly') ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: firstPaydayController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                      RegExp(r'[0-9]')),
+                                  LengthLimitingTextInputFormatter(2),
+                                ],
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: kBackground,
+                                  hintText: 'Ej: 15',
+                                  labelText: 'Primer pago',
+                                  prefixIcon:
+                                      const Icon(Icons.calendar_today_rounded),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: secondPaydayController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                      RegExp(r'[0-9]')),
+                                  LengthLimitingTextInputFormatter(2),
+                                ],
+                                decoration: InputDecoration(
+                                  filled: true,
+                                  fillColor: kBackground,
+                                  hintText: 'Ej: 30',
+                                  labelText: 'Segundo pago',
+                                  prefixIcon:
+                                      const Icon(Icons.event_repeat_rounded),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Como tus ingresos son variables, este dato puede quedar vacío.',
+                            style: TextStyle(
+                              color: kGrey,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Esto nos puede servir después para recordatorios y proyecciones.',
-                          style: TextStyle(
-                            color: kGrey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -902,36 +1060,69 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                     onPressed: saving
                         ? null
                         : () async {
-                            final monthlyIncome = double.tryParse(
-                              incomeController.text.trim().replaceAll(
-                                    RegExp(r'[^0-9]'),
-                                    '',
-                                  ),
+                            final baseMonthlyIncome = double.tryParse(
+                              incomeController.text
+                                  .trim()
+                                  .replaceAll(RegExp(r'[^0-9]'), ''),
                             );
 
-                            final paydayRaw = paydayController.text.trim();
-                            final payday = paydayRaw.isEmpty
-                                ? null
-                                : int.tryParse(paydayRaw);
-
-                            if (monthlyIncome == null || monthlyIncome <= 0) {
+                            if (baseMonthlyIncome == null ||
+                                baseMonthlyIncome <= 0) {
                               _showToast('Ingresa un valor mensual válido');
                               return;
                             }
 
-                            if (payday != null && (payday < 1 || payday > 31)) {
-                              _showToast(
-                                  'El día de pago debe estar entre 1 y 31');
-                              return;
+                            final List<int> paymentDays = [];
+
+                            if (selectedIncomeFrequency == 'monthly') {
+                              final day1 = int.tryParse(
+                                  firstPaydayController.text.trim());
+                              if (day1 != null) {
+                                if (day1 < 1 || day1 > 31) {
+                                  _showToast(
+                                      'El día de pago debe estar entre 1 y 31');
+                                  return;
+                                }
+                                paymentDays.add(day1);
+                              }
+                            }
+
+                            if (selectedIncomeFrequency == 'biweekly') {
+                              final day1 = int.tryParse(
+                                  firstPaydayController.text.trim());
+                              final day2 = int.tryParse(
+                                  secondPaydayController.text.trim());
+
+                              if (day1 == null || day2 == null) {
+                                _showToast('Ingresa los dos días de pago');
+                                return;
+                              }
+
+                              if (day1 < 1 ||
+                                  day1 > 31 ||
+                                  day2 < 1 ||
+                                  day2 > 31) {
+                                _showToast(
+                                    'Los días de pago deben estar entre 1 y 31');
+                                return;
+                              }
+
+                              if (day1 == day2) {
+                                _showToast(
+                                    'Los días de pago no pueden ser iguales');
+                                return;
+                              }
+
+                              paymentDays.addAll([day1, day2]..sort());
                             }
 
                             setLocalState(() => saving = true);
 
                             try {
                               await _saveFinancialProfile(
-                                monthlyIncome: monthlyIncome,
-                                incomeType: selectedIncomeType,
-                                payday: payday,
+                                baseMonthlyIncome: baseMonthlyIncome,
+                                incomeFrequency: selectedIncomeFrequency,
+                                paymentDays: paymentDays,
                               );
 
                               if (dialogContext.mounted) {
@@ -956,19 +1147,22 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                       backgroundColor: kPrimary,
                       foregroundColor: kDark,
                       elevation: 0,
+                      minimumSize: const Size(0, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
+                        horizontal: 8,
+                        vertical: 6,
                       ),
                       child: saving
                           ? const SizedBox(
-                              width: 18,
-                              height: 18,
+                              width: 16,
+                              height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: kDark,
@@ -1014,7 +1208,11 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       borderRadius: BorderRadius.circular(18),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        constraints: const BoxConstraints(
+          minHeight: 110,
+          maxHeight: 110,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
           color: selected ? kPrimary.withOpacity(0.12) : kBackground,
           borderRadius: BorderRadius.circular(18),
@@ -1028,7 +1226,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             Icon(
               icon,
               color: selected ? kDark : kGrey,
-              size: 24,
+              size: 20,
             ),
             const SizedBox(height: 10),
             Text(
@@ -1037,7 +1235,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               style: TextStyle(
                 color: selected ? kDark : kGrey,
                 fontWeight: FontWeight.w800,
-                fontSize: 13,
+                fontSize: 12,
               ),
             ),
             const SizedBox(height: 6),
@@ -1046,7 +1244,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: kGrey,
-                fontSize: 11,
+                fontSize: 10,
                 height: 1.35,
               ),
             ),
@@ -2102,14 +2300,20 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             ),
             const SizedBox(height: 10),
             _miniInfoBox(
-              label: 'Tipo',
-              value: _incomeType == 'fixed' ? 'Fijo' : 'Variable',
+              label: 'Frecuencia',
+              value: _incomeFrequency == 'monthly'
+                  ? 'Mensual'
+                  : _incomeFrequency == 'biweekly'
+                      ? 'Quincenal'
+                      : 'Variable',
               color: kPrimary,
             ),
             const SizedBox(height: 10),
             _miniInfoBox(
-              label: 'Día de pago',
-              value: _payday?.toString() ?? 'No definido',
+              label: 'Días de pago',
+              value: _paymentDays.isEmpty
+                  ? 'No definido'
+                  : _paymentDays.join(', '),
               color: kSuccess,
             ),
           ] else ...[
@@ -2125,16 +2329,22 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: _miniInfoBox(
-                    label: 'Tipo',
-                    value: _incomeType == 'fixed' ? 'Fijo' : 'Variable',
+                    label: 'Frecuencia',
+                    value: _incomeFrequency == 'monthly'
+                        ? 'Mensual'
+                        : _incomeFrequency == 'biweekly'
+                            ? 'Quincenal'
+                            : 'Variable',
                     color: kPrimary,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _miniInfoBox(
-                    label: 'Día de pago',
-                    value: _payday?.toString() ?? 'No definido',
+                    label: 'Días de pago',
+                    value: _paymentDays.isEmpty
+                        ? 'No definido'
+                        : _paymentDays.join(', '),
                     color: kSuccess,
                   ),
                 ),
