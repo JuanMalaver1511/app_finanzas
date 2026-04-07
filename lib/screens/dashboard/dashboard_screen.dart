@@ -356,17 +356,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final String _uid;
   late final String _userName;
 
-  void _showEditDialog(AppTransaction tx) {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black45,
-      builder: (_) => AddTransactionDialog(
-        initial: tx, // ✅ pre-llena el formulario
-        onAdd: (updated) => _txService.update(updated), // ✅ llama update
-      ),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
@@ -374,6 +363,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _uid = user.uid;
     _userName = user.displayName ?? user.email?.split('@').first ?? 'Usuario';
     _txService = TransactionService(_uid);
+
+    Future.delayed(const Duration(milliseconds: 700), () {
+      _checkIncomeReminder();
+    });
   }
 
   Future<void> _logout() async {
@@ -393,6 +386,246 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onAdd: (tx) => _txService.add(tx),
       ),
     );
+  }
+
+  void _showEditDialog(AppTransaction tx) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black45,
+      builder: (_) => AddTransactionDialog(
+        initial: tx,
+        onAdd: (updated) => _txService.update(updated),
+      ),
+    );
+  }
+
+  String _currentIncomePeriodKey({
+    required String frequency,
+    required List<int> paymentDays,
+  }) {
+    final now = DateTime.now();
+
+    if (frequency == 'biweekly' && paymentDays.length >= 2) {
+      final sorted = [...paymentDays]..sort();
+      final firstDay = sorted.first;
+      final secondDay = sorted.last;
+
+      if (now.day >= secondDay) {
+        return '${now.year}-${now.month.toString().padLeft(2, '0')}-q2';
+      }
+
+      if (now.day >= firstDay) {
+        return '${now.year}-${now.month.toString().padLeft(2, '0')}-q1';
+      }
+
+      final prevMonth = DateTime(now.year, now.month - 1);
+      return '${prevMonth.year}-${prevMonth.month.toString().padLeft(2, '0')}-q2';
+    }
+
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-monthly';
+  }
+
+  double _incomeAmountForPeriod({
+    required String frequency,
+    required double baseMonthlyIncome,
+  }) {
+    if (frequency == 'biweekly') {
+      return baseMonthlyIncome / 2;
+    }
+    return baseMonthlyIncome;
+  }
+
+  bool _shouldAskToday({
+    required String frequency,
+    required List<int> paymentDays,
+  }) {
+    final today = DateTime.now();
+
+    for (final day in paymentDays) {
+      final start = DateTime(today.year, today.month, day);
+      final end = start.add(const Duration(days: 5));
+
+      final isInsideWindow = !today.isBefore(start) && !today.isAfter(end);
+
+      if (isInsideWindow) {
+        return true;
+      }
+    }
+
+    if (frequency == 'biweekly' && paymentDays.isNotEmpty) {
+      final sorted = [...paymentDays]..sort();
+      final lastDay = sorted.last;
+
+      final lastStart = DateTime(today.year, today.month - 1, lastDay);
+      final lastEnd = lastStart.add(const Duration(days: 5));
+
+      final isCrossMonthWindow =
+          !today.isBefore(lastStart) && !today.isAfter(lastEnd);
+
+      if (isCrossMonthWindow) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  Future<void> _checkIncomeReminder() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_uid)
+        .collection('settings')
+        .doc('finance')
+        .get();
+
+    if (!doc.exists) return;
+
+    final data = doc.data();
+    if (data == null) return;
+
+    final baseMonthlyIncome =
+        ((data['baseMonthlyIncome'] ?? 0) as num).toDouble();
+    final financialProfileCompleted = data['financialProfileCompleted'] == true;
+
+    if (!financialProfileCompleted || baseMonthlyIncome <= 0) return;
+
+    final rawDays = data['paymentDays'];
+    if (rawDays is! List || rawDays.isEmpty) return;
+
+    final paymentDays = rawDays
+        .map((e) => e is int ? e : int.tryParse(e.toString()))
+        .whereType<int>()
+        .toList()
+      ..sort();
+
+    if (paymentDays.isEmpty) return;
+
+    final frequency = (data['incomeFrequency'] ?? 'monthly').toString();
+
+    final periodKey = _currentIncomePeriodKey(
+      frequency: frequency,
+      paymentDays: paymentDays,
+    );
+
+    final prefsDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_uid)
+        .collection('settings')
+        .doc('income_control')
+        .get();
+
+    if (prefsDoc.exists) {
+      final lastShownPeriod = prefsDoc.data()?['lastShownPeriod'];
+      if (lastShownPeriod == periodKey) return;
+    }
+
+    if (_shouldAskToday(
+          frequency: frequency,
+          paymentDays: paymentDays,
+        ) &&
+        mounted) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .collection('settings')
+          .doc('income_control')
+          .set({
+        'lastShownPeriod': periodKey,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      _showIncomeDialog(
+        frequency: frequency,
+        periodKey: periodKey,
+      );
+    }
+  }
+
+  void _showIncomeDialog({
+    required String frequency,
+    required String periodKey,
+  }) {
+    final label = frequency == 'biweekly'
+        ? 'Confirma si ya recibiste este pago quincenal.'
+        : 'Confirma si ya recibiste tu pago programado.';
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        title: const Text('¿Recibiste tu ingreso?'),
+        content: Text(label),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Aún no'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _createIncomeTransaction(periodKey: periodKey);
+            },
+            child: const Text('Sí, recibido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createIncomeTransaction({
+    required String periodKey,
+  }) async {
+    final financeDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_uid)
+        .collection('settings')
+        .doc('finance')
+        .get();
+
+    if (!financeDoc.exists) return;
+
+    final data = financeDoc.data();
+    if (data == null) return;
+
+    final frequency = (data['incomeFrequency'] ?? 'monthly').toString();
+    final baseMonthlyIncome =
+        ((data['baseMonthlyIncome'] ?? 0) as num).toDouble();
+
+    if (baseMonthlyIncome <= 0) return;
+
+    final amount = _incomeAmountForPeriod(
+      frequency: frequency,
+      baseMonthlyIncome: baseMonthlyIncome,
+    );
+
+    final existing = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_uid)
+        .collection('transactions')
+        .where('source', isEqualTo: 'scheduled_income')
+        .where('periodKey', isEqualTo: periodKey)
+        .limit(1)
+        .get();
+
+    if (existing.docs.isNotEmpty) return;
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(_uid)
+        .collection('transactions')
+        .add({
+      'title': frequency == 'biweekly' ? 'Pago quincenal' : 'Salario',
+      'amount': amount,
+      'isIncome': true,
+      'categoryName': 'Trabajo',
+      'category': 'Trabajo',
+      'source': 'scheduled_income',
+      'periodKey': periodKey,
+      'date': Timestamp.now(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 
   @override
@@ -952,8 +1185,16 @@ class _BudgetBarsCard extends StatelessWidget {
           );
         }
 
+        final now = DateTime.now();
+
+        final currentMonthTransactions = transactions.where((t) {
+          return !t.isIncome &&
+              t.date.year == now.year &&
+              t.date.month == now.month;
+        }).toList();
+
         final Map<String, double> totals = {};
-        for (final tx in transactions.where((t) => !t.isIncome)) {
+        for (final tx in currentMonthTransactions) {
           totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
         }
 
@@ -1040,7 +1281,8 @@ class _BudgetBarsCard extends StatelessWidget {
                     final color = _parseColor(item['color']);
 
                     final spent = totals[name] ?? 0.0;
-                    final pct = (spent / planned).clamp(0.0, 1.0);
+                    final pct =
+                        planned > 0 ? (spent / planned).clamp(0.0, 1.0) : 0.0;
                     final exceeded = spent > planned;
 
                     return Padding(
