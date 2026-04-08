@@ -26,7 +26,7 @@ class _MainLayoutState extends State<MainLayout> {
         DashboardScreen(onChange: _onChange),
         const MovementsScreen(),
         const BudgetsScreen(),
-        const GoalsScreen(),
+        GoalsScreen(onBack: () => _onChange(0)),
         const DeudasScreen(),
         ProfileScreen(onBack: () => _onChange(0)),
       ];
