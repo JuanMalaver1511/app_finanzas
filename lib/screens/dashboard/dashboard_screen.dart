@@ -11,6 +11,9 @@ import 'package:intl/intl.dart';
 import '../../widgets/IA/ia.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../notifications/notifications_screen.dart';
+import '../../services/goal_service.dart';
+import '../../models/goal_model.dart';
+import '../../utils/goal_calculator.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
@@ -355,6 +358,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final TransactionService _txService;
   late final String _uid;
   late final String _userName;
+  late final GoalService _goalService;
 
   @override
   void initState() {
@@ -363,6 +367,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _uid = user.uid;
     _userName = user.displayName ?? user.email?.split('@').first ?? 'Usuario';
     _txService = TransactionService(_uid);
+    _goalService = GoalService();
 
     Future.delayed(const Duration(milliseconds: 700), () {
       _checkIncomeReminder();
@@ -727,7 +732,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             },
                           ),
                           const SizedBox(height: 16),
+                          _GoalsHighlightCard(
+                            goalService: _goalService,
+                            onOpenGoals: () => widget.onChange(3),
+                          ),
+                          const SizedBox(height: 16),
                         ],
+
                         _TransactionsCard(
                           transactions: transactions,
                           onDelete: (id) => _txService.delete(id),
@@ -1584,5 +1595,568 @@ Color _parseColor(String? hex) {
     return Color(int.parse('FF$clean', radix: 16));
   } catch (_) {
     return const Color(0xFFCBD5E1);
+  }
+}
+
+// ─────────────────────────────────────────────
+// GOALS HIGHLIGHT (DASHBOARD)
+// ─────────────────────────────────────────────
+
+class _GoalsHighlightCard extends StatelessWidget {
+  final GoalService goalService;
+  final VoidCallback onOpenGoals;
+
+  const _GoalsHighlightCard({
+    required this.goalService,
+    required this.onOpenGoals,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<GoalModel>>(
+      stream: goalService.streamGoals(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(18),
+            decoration: _cardDecoration(),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  'Cargando metas...',
+                  style: TextStyle(
+                    color: kGrey,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Container(
+            padding: const EdgeInsets.all(18),
+            decoration: _cardDecoration(),
+            child: const Text(
+              'No se pudieron cargar las metas.',
+              style: TextStyle(
+                color: kDark,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          );
+        }
+
+        final goals = snapshot.data ?? [];
+
+        if (goals.isEmpty) {
+          return _GoalsDashboardEmpty(onOpenGoals: onOpenGoals);
+        }
+
+        final visibleGoals = _pickGoals(goals);
+
+        final activeGoals =
+            goals.where((g) => g.status != GoalStatus.completed).length;
+        final completedGoals =
+            goals.where((g) => g.status == GoalStatus.completed).length;
+        final totalSaved =
+            goals.fold<double>(0, (sum, item) => sum + item.savedAmount);
+
+        final isMobile = MediaQuery.of(context).size.width < 700;
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(isMobile ? 16 : 20),
+          decoration: _cardDecoration(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tus metas',
+                          style: TextStyle(
+                            color: kDark,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Revisa tus objetivos más importantes del momento.',
+                          style: TextStyle(
+                            color: kGrey,
+                            fontSize: 12.8,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!isMobile)
+                    SizedBox(
+                      height: 42,
+                      child: ElevatedButton(
+                        onPressed: onOpenGoals,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Ver todas las metas',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _GoalSummaryChip(
+                    title: 'Activas',
+                    value: '$activeGoals',
+                    icon: Icons.flag_rounded,
+                  ),
+                  _GoalSummaryChip(
+                    title: 'Cumplidas',
+                    value: '$completedGoals',
+                    icon: Icons.verified_rounded,
+                  ),
+                  _GoalSummaryChip(
+                    title: 'Ahorrado',
+                    value: _formatMoney(totalSaved, compact: true),
+                    icon: Icons.savings_rounded,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (isMobile)
+                Column(
+                  children: visibleGoals
+                      .map(
+                        (goal) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _GoalDashboardTile(goal: goal),
+                        ),
+                      )
+                      .toList(),
+                )
+              else
+                Row(
+                  children: visibleGoals
+                      .asMap()
+                      .entries
+                      .map(
+                        (entry) => Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right:
+                                  entry.key == visibleGoals.length - 1 ? 0 : 12,
+                            ),
+                            child: _GoalDashboardTile(goal: entry.value),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              if (isMobile) ...[
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: onOpenGoals,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Ver todas las metas',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<GoalModel> _pickGoals(List<GoalModel> goals) {
+    final sorted = [...goals];
+
+    int priority(GoalModel goal) {
+      switch (goal.status) {
+        case GoalStatus.delayed:
+          return 0;
+        case GoalStatus.atRisk:
+          return 1;
+        case GoalStatus.active:
+          return 2;
+        case GoalStatus.completed:
+          return 3;
+      }
+    }
+
+    sorted.sort((a, b) {
+      final p = priority(a).compareTo(priority(b));
+      if (p != 0) return p;
+      return a.deadline.compareTo(b.deadline);
+    });
+
+    return sorted.take(2).toList();
+  }
+}
+
+class _GoalsDashboardEmpty extends StatelessWidget {
+  final VoidCallback onOpenGoals;
+
+  const _GoalsDashboardEmpty({
+    required this.onOpenGoals,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Tus metas',
+            style: TextStyle(
+              color: kDark,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Aún no has creado metas. Empieza con una meta de ahorro y hazle seguimiento desde aquí.',
+            style: TextStyle(
+              color: kGrey,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: onOpenGoals,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            icon: const Icon(Icons.flag_rounded),
+            label: const Text(
+              'Crear meta',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalSummaryChip extends StatelessWidget {
+  final String title;
+  final String value;
+  final IconData icon;
+
+  const _GoalSummaryChip({
+    required this.title,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: kAmber.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: kAmber, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  color: kDark,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: kGrey,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalDashboardTile extends StatelessWidget {
+  final GoalModel goal;
+
+  const _GoalDashboardTile({
+    required this.goal,
+  });
+
+  String _formatShortDate(DateTime date) {
+    const months = [
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+    ];
+
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Color _statusColor(GoalStatus status) {
+    switch (status) {
+      case GoalStatus.active:
+        return kGreenBtn;
+      case GoalStatus.atRisk:
+        return kAmber;
+      case GoalStatus.delayed:
+        return kRed;
+      case GoalStatus.completed:
+        return kPrimary;
+    }
+  }
+
+  IconData _statusIcon(GoalStatus status) {
+    switch (status) {
+      case GoalStatus.active:
+        return Icons.trending_up_rounded;
+      case GoalStatus.atRisk:
+        return Icons.warning_amber_rounded;
+      case GoalStatus.delayed:
+        return Icons.access_time_filled_rounded;
+      case GoalStatus.completed:
+        return Icons.verified_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final calculation = GoalCalculator.calculate(
+      targetAmount: goal.targetAmount,
+      savedAmount: goal.savedAmount,
+      deadline: goal.deadline,
+      frequency: goal.savingFrequency,
+      now: DateTime.now(),
+    );
+
+    final progress = (goal.progress * 100).round();
+    final statusColor = _statusColor(goal.status);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  goal.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: kDark,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _statusIcon(goal.status),
+                      color: statusColor,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      GoalCalculator.statusLabel(goal.status),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '$progress%',
+            style: const TextStyle(
+              color: kDark,
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.7,
+            ),
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: goal.progress,
+              minHeight: 8,
+              backgroundColor: const Color(0xFFEAECEF),
+              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '${_formatMoney(goal.savedAmount, compact: true)} de ${_formatMoney(goal.targetAmount, compact: true)}',
+            style: const TextStyle(
+              color: kGrey,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MiniInfoChip(
+                icon: Icons.event_rounded,
+                text: _formatShortDate(goal.deadline),
+              ),
+              _MiniInfoChip(
+                icon: Icons.payments_rounded,
+                text: _formatMoney(
+                  calculation.suggestedAmountPerPeriod,
+                  compact: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniInfoChip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _MiniInfoChip({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: kDark),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              color: kDark,
+              fontSize: 11.8,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
