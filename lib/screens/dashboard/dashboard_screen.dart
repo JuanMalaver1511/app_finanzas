@@ -21,6 +21,7 @@ const kAmber = Color(0xFFFFBB4E);
 const kBg = Color(0xFFF0F2F5);
 const kCard = Colors.white;
 const kDark = Color(0xFF1A1A2E);
+const KDarkB = Color.fromARGB(255, 40, 40, 88);
 const kGrey = Color(0xFF8A8A9A);
 const kGreen = Color.fromARGB(255, 29, 126, 69);
 const kRed = Color(0xFFE74C3C);
@@ -1489,13 +1490,37 @@ class _TxRow extends StatelessWidget {
                 color: tx.isIncome ? kGreen : kRed),
           ),
           const SizedBox(width: 4),
-          GestureDetector(
-            onTap: onEdit,
-            child: const Icon(Icons.edit_outlined, size: 18, color: kGrey),
-          ),
-          GestureDetector(
-            onTap: () => _confirmDelete(context),
-            child: const Icon(Icons.delete_outline, size: 18, color: kGrey),
+          // Botones de editar y eliminar con backgrounds separados
+          Row(
+            children: [
+              GestureDetector(
+                onTap: onEdit,
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: kAmber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child:
+                      const Icon(Icons.edit_outlined, size: 16, color: kAmber),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _confirmDelete(context),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: kRed.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child:
+                      const Icon(Icons.delete_outline, size: 16, color: kRed),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1712,7 +1737,7 @@ class _GoalsHighlightCard extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: onOpenGoals,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimary,
+                          backgroundColor: KDarkB,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(

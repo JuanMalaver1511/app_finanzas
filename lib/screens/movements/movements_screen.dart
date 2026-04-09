@@ -218,27 +218,27 @@ class _MovementsScreenState extends State<MovementsScreen>
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isMobile = constraints.maxWidth < 600;
-                final isTablet =
-                    constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
                 final isDesktop = constraints.maxWidth >= 1024;
 
-                double maxWidth;
-                if (isMobile) {
-                  maxWidth = constraints.maxWidth;
-                } else if (isTablet) {
-                  maxWidth = 900;
+                if (isDesktop) {
+                  // Para desktop, ocupar todo el ancho con márgenes
+                  return _buildDesktopLayout();
                 } else {
-                  maxWidth = 1200;
-                }
+                  // Para móvil y tablet, centrar con ancho máximo
+                  double maxWidth;
+                  if (isMobile) {
+                    maxWidth = constraints.maxWidth;
+                  } else {
+                    maxWidth = 900;
+                  }
 
-                return Center(
-                  child: SizedBox(
-                    width: maxWidth,
-                    child: isDesktop
-                        ? _buildDesktopLayout(maxWidth)
-                        : _buildMobileLayout(isMobile),
-                  ),
-                );
+                  return Center(
+                    child: SizedBox(
+                      width: maxWidth,
+                      child: _buildMobileLayout(isMobile),
+                    ),
+                  );
+                }
               },
             ),
           ),
@@ -293,7 +293,7 @@ class _MovementsScreenState extends State<MovementsScreen>
     );
   }
 
-  Widget _buildDesktopLayout(double maxWidth) {
+  Widget _buildDesktopLayout() {
     return Column(
       children: [
         _buildDesktopHeader(),
@@ -309,51 +309,60 @@ class _MovementsScreenState extends State<MovementsScreen>
                   .where((t) => !t.isIncome)
                   .fold(0.0, (a, b) => a + b.amount);
 
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(32, 8, 32, 0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 5,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            _buildMonthSelector(),
-                            const SizedBox(height: 16),
-                            _buildSummaryCards(income, expense, false),
-                            const SizedBox(height: 20),
-                            _buildChartSection(),
-                            const SizedBox(height: 90),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      flex: 5,
-                      child: Column(
-                        children: [
-                          _buildCategoryFilter(),
-                          const SizedBox(height: 16),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                  _buildTransactionList(
-                                    list,
-                                    snap.connectionState,
-                                  ),
-                                  const SizedBox(height: 90),
-                                ],
-                              ),
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final horizontalPadding = constraints.maxWidth > 1400
+                      ? (constraints.maxWidth - 1400) / 2 + 32
+                      : 32.0;
+
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                        horizontalPadding, 8, horizontalPadding, 0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                _buildMonthSelector(),
+                                const SizedBox(height: 16),
+                                _buildSummaryCards(income, expense, false),
+                                const SizedBox(height: 20),
+                                _buildChartSection(),
+                                const SizedBox(height: 90),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 24),
+                        Expanded(
+                          flex: 5,
+                          child: Column(
+                            children: [
+                              _buildCategoryFilter(),
+                              const SizedBox(height: 16),
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    children: [
+                                      _buildTransactionList(
+                                        list,
+                                        snap.connectionState,
+                                      ),
+                                      const SizedBox(height: 90),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),
@@ -363,57 +372,66 @@ class _MovementsScreenState extends State<MovementsScreen>
   }
 
   Widget _buildDesktopHeader() {
-    return Container(
-      color: kBg,
-      padding: const EdgeInsets.fromLTRB(32, 16, 32, 12),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () {
-              Navigator.pushNamed(context, '/');
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: kCard,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: kDark.withOpacity(0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontalPadding = constraints.maxWidth > 1400
+            ? (constraints.maxWidth - 1400) / 2 + 32
+            : 32.0;
+
+        return Container(
+          color: kBg,
+          padding:
+              EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 12),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(context, '/');
+                },
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: kCard,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: kDark.withOpacity(0.06),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                ],
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: kDark,
+                    size: 18,
+                  ),
+                ),
               ),
-              child: const Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: kDark,
-                size: 18,
+              const SizedBox(width: 16),
+              Container(
+                width: 7,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: kAmber,
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              const Text(
+                'Mis Movimientos',
+                style: TextStyle(
+                  color: kDark,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 22,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Container(
-            width: 7,
-            height: 22,
-            decoration: BoxDecoration(
-              color: kAmber,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Text(
-            'Mis Movimientos',
-            style: TextStyle(
-              color: kDark,
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

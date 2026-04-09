@@ -296,7 +296,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               child: ElevatedButton.icon(
                 onPressed: _openCreateGoal,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kDark,
+                  backgroundColor: kAmber,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -348,7 +348,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
         padding: EdgeInsets.all(isMobile ? 16 : 20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF2B2257), Color(0xFF463A8A)],
+            colors: [Color(0xFF1A1A2E), Color.fromARGB(255, 48, 48, 80)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
