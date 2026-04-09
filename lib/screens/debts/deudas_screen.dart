@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
@@ -252,7 +253,7 @@ class _DeudasScreenState extends State<DeudasScreen>
       // 🔴 Hay deudas vencidas
       final deuda = deudosVencidas.first;
       final mensaje =
-          '⚠️ Esta cuota está vencida\n${deuda.nombre} - ${fmt(deuda.cuotaMensual)}';
+          'Esta cuota está vencida\n${deuda.nombre} - ${fmt(deuda.cuotaMensual)}';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -273,7 +274,7 @@ class _DeudasScreenState extends State<DeudasScreen>
       // 🟡 Sin vencidas, pero hay próxima cuota
       final diasFalta = proximoCuota.diaPago - DateTime.now().day;
       final mensaje =
-          '📅 Próxima cuota: ${proximoCuota.nombre}\nDía ${proximoCuota.diaPago}: ${fmt(proximoCuota.cuotaMensual)}';
+          'Próxima cuota: ${proximoCuota.nombre}\nDía ${proximoCuota.diaPago}: ${fmt(proximoCuota.cuotaMensual)}';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -376,7 +377,7 @@ class _DeudasScreenState extends State<DeudasScreen>
           const SizedBox(width: 10),
           const Text('Mis Deudas',
               style: TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 20, color: kDark)),
+                  fontWeight: FontWeight.w800, fontSize: 24, color: kDark)),
           const Spacer(),
           GestureDetector(
             onTap: _showDebtHelpDialog,
@@ -1732,6 +1733,7 @@ class _DeudasScreenState extends State<DeudasScreen>
   // ─────────────────────────────────────────────────────────────────────────
 
   void _showAddDebt() {
+    final formKey = GlobalKey<FormState>();
     final nombre = TextEditingController();
     final monto = TextEditingController();
     final saldo = TextEditingController();
@@ -1743,7 +1745,7 @@ class _DeudasScreenState extends State<DeudasScreen>
     bool isLoading = false;
 
     // Función para calcular cuota mensual con interés
-    void _calcularCuota() {
+    void calcularCuota() {
       final montoVal = double.tryParse(monto.text) ?? 0;
       final interesVal = double.tryParse(interes.text) ?? 0;
       final numCuotasVal = int.tryParse(numCuotasCtrl.text) ?? 12;
@@ -1754,11 +1756,9 @@ class _DeudasScreenState extends State<DeudasScreen>
       }
 
       if (interesVal == 0) {
-        // Sin interés: cuota simple
         final cuotaSimple = montoVal / numCuotasVal;
         cuota.text = cuotaSimple.toStringAsFixed(0);
       } else {
-        // Con interés: fórmula de amortización
         final tasaMensual = (interesVal / 100) / 12;
         final numerador =
             montoVal * tasaMensual * pow(1 + tasaMensual, numCuotasVal);
@@ -1775,151 +1775,216 @@ class _DeudasScreenState extends State<DeudasScreen>
         builder: (ctx, setM) => _centeredDialog(
           title: 'Nueva deuda',
           icon: Icons.add_card_rounded,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _field('Nombre de la deuda', nombre,
-                    hint: 'Ej: Tarjeta Bancolombia'),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(
-                      child: _dropdownField(
-                          'Tipo',
-                          tipo,
-                          ['personal', 'tarjeta', 'hipoteca', 'vehiculo'],
-                          ['Personal', 'Tarjeta', 'Hipoteca', 'Vehículo'],
-                          (v) => setM(() => tipo = v ?? 'personal'))),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child: _dropdownIntField(
-                          'Día pago',
-                          diaPago,
-                          List.generate(28, (i) => i + 1),
-                          List.generate(28, (i) => '${i + 1}'),
-                          (v) => setM(() => diaPago = v ?? 1))),
-                ]),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(
-                      child: _field('Monto total', monto,
-                          hint: '0',
-                          isNumber: true,
-                          onChanged: (_) => setM(_calcularCuota))),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child: _field('Saldo actual', saldo,
-                          hint: '0', isNumber: true)),
-                ]),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(
-                      child: _field('Cuotas', numCuotasCtrl,
-                          hint: '12',
-                          isNumber: true,
-                          onChanged: (_) => setM(_calcularCuota))),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child: _field('Interés % EA', interes,
-                          hint: '0',
-                          isNumber: true,
-                          onChanged: (_) => setM(_calcularCuota))),
-                ]),
-                const SizedBox(height: 10),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: kGreenLight,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kGreen.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calculate_rounded,
-                          color: kGreen, size: 16),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Cuota calculada',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  color: kGreenDark,
-                                  fontWeight: FontWeight.w500)),
-                          Text(
-                            cuota.text.isEmpty ? '\$0' : '\$${cuota.text}',
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: kGreenDark),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => setM(() => cuota.clear()),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: kGreen.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text('Editar',
-                                textAlign: TextAlign.center,
+          child: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _field('Nombre de la deuda', nombre,
+                      hint: 'Ej: Tarjeta Bancolombia', validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Nombre obligatorio';
+                    }
+                    return null;
+                  }),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(
+                        child: _dropdownField(
+                            'Tipo',
+                            tipo,
+                            ['personal', 'tarjeta', 'hipoteca', 'vehiculo'],
+                            ['Personal', 'Tarjeta', 'Hipoteca', 'Vehículo'],
+                            (v) => setM(() => tipo = v ?? 'personal'))),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: _dropdownIntField(
+                            'Día pago',
+                            diaPago,
+                            List.generate(28, (i) => i + 1),
+                            List.generate(28, (i) => '${i + 1}'),
+                            (v) => setM(() => diaPago = v ?? 1))),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(
+                        child: _field('Monto total', monto,
+                            hint: '0',
+                            isNumber: true,
+                            onChanged: (_) => setM(calcularCuota),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Monto obligatorio';
+                              }
+                              final parsed =
+                                  double.tryParse(value.replaceAll(',', '.'));
+                              if (parsed == null || parsed <= 0) {
+                                return 'Ingresa un monto válido';
+                              }
+                              return null;
+                            })),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: _field('Saldo actual', saldo,
+                            hint: '0', isNumber: true, validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Saldo obligatorio';
+                      }
+                      final parsed =
+                          double.tryParse(value.replaceAll(',', '.'));
+                      if (parsed == null || parsed < 0) {
+                        return 'Ingresa un saldo válido';
+                      }
+                      return null;
+                    })),
+                  ]),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Expanded(
+                        child: _field('Cuotas', numCuotasCtrl,
+                            hint: '12',
+                            isNumber: true,
+                            onChanged: (_) => setM(calcularCuota),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Cuotas obligatorias';
+                              }
+                              final parsed = int.tryParse(value);
+                              if (parsed == null || parsed <= 0) {
+                                return 'Ingresa un número válido';
+                              }
+                              return null;
+                            })),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: _field('Interés % EA', interes,
+                            hint: '0',
+                            isNumber: true,
+                            onChanged: (_) => setM(calcularCuota),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Interés obligatorio';
+                              }
+                              final parsed =
+                                  double.tryParse(value.replaceAll(',', '.'));
+                              if (parsed == null || parsed < 0) {
+                                return 'Ingresa un interés válido';
+                              }
+                              return null;
+                            })),
+                  ]),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: kGreenLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: kGreen.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calculate_rounded,
+                            color: kGreen, size: 16),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Cuota calculada',
                                 style: TextStyle(
                                     fontSize: 10,
                                     color: kGreenDark,
-                                    fontWeight: FontWeight.w600)),
+                                    fontWeight: FontWeight.w500)),
+                            Text(
+                              cuota.text.isEmpty ? '\$0' : '\$${cuota.text}',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: kGreenDark),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setM(() => cuota.clear()),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: kGreen.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text('Editar',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: kGreenDark,
+                                      fontWeight: FontWeight.w600)),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                _field('Cuota mensual', cuota, hint: '0', isNumber: true),
-                const SizedBox(height: 16),
-                Row(children: [
-                  Expanded(child: _cancelBtn(() {
-                    Navigator.pop(context);
-                  })),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: _submitBtn('Guardar deuda', () async {
-                      if (isLoading) return;
-                      setM(() => isLoading = true);
-                      try {
-                        final n = nombre.text.trim();
-                        final m = double.tryParse(monto.text) ?? 0;
-                        final s = double.tryParse(saldo.text) ?? m;
-                        final c = double.tryParse(cuota.text) ?? 0;
-                        final ii = double.tryParse(interes.text) ?? 0;
-                        if (n.isEmpty || m <= 0) {
+                  const SizedBox(height: 8),
+                  _field('Cuota mensual', cuota, hint: '0', isNumber: true,
+                      validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Cuota obligatoria';
+                    }
+                    final parsed = double.tryParse(value.replaceAll(',', '.'));
+                    if (parsed == null || parsed <= 0) {
+                      return 'Ingresa una cuota válida';
+                    }
+                    return null;
+                  }),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: _cancelBtn(() {
+                      Navigator.pop(context);
+                    })),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: _submitBtn('Guardar deuda', () async {
+                        if (isLoading) return;
+                        if (formKey.currentState?.validate() != true) return;
+                        setM(() => isLoading = true);
+                        try {
+                          final n = nombre.text.trim();
+                          final m = double.tryParse(
+                                  monto.text.replaceAll(',', '.')) ??
+                              0;
+                          final s = double.tryParse(
+                                  saldo.text.replaceAll(',', '.')) ??
+                              m;
+                          final c = double.tryParse(
+                                  cuota.text.replaceAll(',', '.')) ??
+                              0;
+                          final ii = double.tryParse(
+                                  interes.text.replaceAll(',', '.')) ??
+                              0;
+                          await _debtsRef.add({
+                            'nombre': n,
+                            'tipo': tipo,
+                            'monto_total': m,
+                            'saldo_actual': s,
+                            'cuota_mensual': c,
+                            'dia_pago': diaPago,
+                            'interes': ii,
+                          });
+                          if (context.mounted) Navigator.pop(context);
+                        } catch (e) {
                           setM(() => isLoading = false);
-                          return;
                         }
-                        await _debtsRef.add({
-                          'nombre': n,
-                          'tipo': tipo,
-                          'monto_total': m,
-                          'saldo_actual': s,
-                          'cuota_mensual': c,
-                          'dia_pago': diaPago,
-                          'interes': ii,
-                        });
-                        if (context.mounted) Navigator.pop(context);
-                      } catch (e) {
-                        setM(() => isLoading = false);
-                      }
-                    }, isLoading: isLoading),
-                  ),
-                ]),
-              ],
+                      }, isLoading: isLoading),
+                    ),
+                  ]),
+                ],
+              ),
             ),
           ),
         ),
@@ -2640,16 +2705,27 @@ class _DeudasScreenState extends State<DeudasScreen>
   }
 
   Widget _field(String label, TextEditingController ctrl,
-      {String? hint, bool isNumber = false, Function(String)? onChanged}) {
+      {String? hint,
+      bool isNumber = false,
+      Function(String)? onChanged,
+      String? Function(String?)? validator}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontSize: 12, color: kGrey)),
         const SizedBox(height: 5),
-        TextField(
+        TextFormField(
           controller: ctrl,
-          keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+          keyboardType: isNumber
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.text,
+          inputFormatters: isNumber
+              ? <TextInputFormatter>[
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ]
+              : null,
           onChanged: onChanged,
+          validator: validator,
           decoration: _inputDeco(hint: hint),
         ),
       ],

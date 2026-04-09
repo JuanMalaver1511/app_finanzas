@@ -7,8 +7,8 @@ import 'package:file_picker/file_picker.dart';
 const kAmber = Color(0xFFFFB84E);
 const kBg = Color(0xFFF6F7FB);
 const kCard = Colors.white;
-const kPrimary = Color(0xFF2B2257);
-const kPrimarySoft = Color(0xFF3B2F79);
+const kPrimary = Color(0xFF1A1A2E);
+const kPrimarySoft = Color.fromARGB(255, 42, 36, 76);
 const kGrey = Color(0xFF8A8A9A);
 const kGreen = Color(0xFF16A34A);
 const kRed = Color(0xFFEF4444);
@@ -450,7 +450,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 runSpacing: 10,
                 children: [
                   _StatusPill(
-                    text: 'Miembro desde ${_formatDate(user.metadata.creationTime)}',
+                    text:
+                        'Miembro desde ${_formatDate(user.metadata.creationTime)}',
                     light: true,
                   ),
                 ],
@@ -589,8 +590,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       fillColor: const Color(0xFFF9FAFD),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -598,8 +598,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
                       ),
                     ),
                   ),
@@ -1065,7 +1064,8 @@ class _StatusPill extends StatelessWidget {
         color: light ? Colors.white.withOpacity(.10) : kAmber.withOpacity(.12),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: light ? Colors.white.withOpacity(.12) : kAmber.withOpacity(.18),
+          color:
+              light ? Colors.white.withOpacity(.12) : kAmber.withOpacity(.18),
         ),
       ),
       child: Text(

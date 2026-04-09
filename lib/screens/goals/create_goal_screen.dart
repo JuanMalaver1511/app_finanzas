@@ -54,7 +54,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
   }
 
   double get _targetAmount => _parseAmount(_targetAmountController.text);
-  double get _initialSavedAmount => _parseAmount(_initialSavedAmountController.text);
+  double get _initialSavedAmount =>
+      _parseAmount(_initialSavedAmountController.text);
 
   GoalCalculationResult? get _previewCalculation {
     if (_targetAmount <= 0 || _selectedDeadline == null) return null;
@@ -399,7 +400,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: hasImage ? kAmber.withOpacity(0.45) : Colors.grey.shade200,
+                color:
+                    hasImage ? kAmber.withOpacity(0.45) : Colors.grey.shade200,
                 width: hasImage ? 1.3 : 1,
               ),
             ),
@@ -752,7 +754,7 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'por ${GoalCalculator.frequencyLabel(_selectedFrequency).toLowerCase()}',
+                    ' ${GoalCalculator.frequencyLabel(_selectedFrequency).toLowerCase()}',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.88),
                       fontSize: 14,
@@ -917,7 +919,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                 _buildTextField(
                                   controller: _titleController,
                                   label: 'Nombre de la meta',
-                                  hint: 'Ej: Viaje a Cartagena, mi moto, fondo de emergencia',
+                                  hint:
+                                      'Ej: Viaje a Cartagena, mi moto, fondo de emergencia',
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
                                       return 'Ingresa un nombre para tu meta.';
@@ -938,7 +941,9 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                   controller: _targetAmountController,
                                   label: 'Monto objetivo',
                                   hint: 'Ej: 1500000',
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
                                   validator: (value) {
                                     final amount = _parseAmount(value ?? '');
                                     if (amount <= 0) {
@@ -957,13 +962,16 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                   controller: _initialSavedAmountController,
                                   label: '¿Ya llevas algo ahorrado? (opcional)',
                                   hint: 'Ej: 200000',
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
                                   validator: (value) {
                                     final amount = _parseAmount(value ?? '');
                                     if (amount < 0) {
                                       return 'El valor no puede ser negativo.';
                                     }
-                                    if (_targetAmount > 0 && amount > _targetAmount) {
+                                    if (_targetAmount > 0 &&
+                                        amount > _targetAmount) {
                                       return 'No puede ser mayor al monto objetivo.';
                                     }
                                     return null;
@@ -982,7 +990,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                 _buildTextField(
                                   controller: _motivationController,
                                   label: 'Motivación (opcional)',
-                                  hint: 'Ej: Quiero lograrlo antes de finalizar el año',
+                                  hint:
+                                      'Ej: Quiero lograrlo antes de finalizar el año',
                                   maxLines: 3,
                                   onChanged: (_) => setState(() {}),
                                   prefixIcon: const Padding(
