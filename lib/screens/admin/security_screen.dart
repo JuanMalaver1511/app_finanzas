@@ -106,8 +106,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
       final name = user.name.toLowerCase();
       final email = user.email.toLowerCase();
 
-      final matchesSearch =
-          name.contains(search) || email.contains(search);
+      final matchesSearch = name.contains(search) || email.contains(search);
 
       bool matchesFilter = true;
 
@@ -468,9 +467,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
                   color: isSelected ? _kyboPrimary : Colors.white,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: isSelected
-                        ? _kyboPrimary
-                        : const Color(0xFFE7E9F1),
+                    color: isSelected ? _kyboPrimary : const Color(0xFFE7E9F1),
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -735,10 +732,9 @@ class _SecurityScreenState extends State<SecurityScreen> {
           const SizedBox(width: 10),
           Switch(
             value: user.isActive,
-            activeColor: _success,
-            onChanged: disabled
-                ? null
-                : (_) => toggleUser(user.uid, user.isActive),
+            activeThumbColor: _success,
+            onChanged:
+                disabled ? null : (_) => toggleUser(user.uid, user.isActive),
           ),
         ],
       ),

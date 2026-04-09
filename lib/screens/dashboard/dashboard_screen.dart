@@ -1239,9 +1239,9 @@ class _BudgetBarsCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // HEADER
-                  Row(
+                  const Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -1261,7 +1261,7 @@ class _BudgetBarsCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Icon(Icons.chevron_right_rounded, color: kGrey),
+                      Icon(Icons.chevron_right_rounded, color: kGrey),
                     ],
                   ),
 

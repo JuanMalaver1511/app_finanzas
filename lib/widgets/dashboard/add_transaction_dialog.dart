@@ -1003,7 +1003,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                       child: Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: selectedValue,
+                            initialValue: selectedValue,
                             isExpanded: true,
                             decoration: const InputDecoration(
                               border: InputBorder.none,

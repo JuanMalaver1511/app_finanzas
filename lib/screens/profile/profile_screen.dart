@@ -368,7 +368,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       value: user.email != null ? 'Registrado' : 'Sin correo',
                       color: kBlue,
                     ),
-                    _HeroChip(
+                    const _HeroChip(
                       title: 'Perfil',
                       value: 'Activo',
                       color: kGreen,
@@ -390,7 +390,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       value: user.email != null ? 'Registrado' : 'Sin correo',
                       color: kBlue,
                     ),
-                    _HeroChip(
+                    const _HeroChip(
                       title: 'Perfil',
                       value: 'Activo',
                       color: kGreen,

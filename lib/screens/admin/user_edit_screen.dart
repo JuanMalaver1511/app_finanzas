@@ -696,7 +696,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
 
   Widget _buildRoleField() {
     return DropdownButtonFormField<String>(
-      value: role,
+      initialValue: role,
       decoration: _inputDecoration(
         label: "Rol",
         hint: "Selecciona un rol",
@@ -758,7 +758,7 @@ class _UserEditScreenState extends State<UserEditScreen> {
           SwitchListTile(
             value: isActive,
             contentPadding: EdgeInsets.zero,
-            activeColor: _success,
+            activeThumbColor: _success,
             title: Text(
               isActive ? "Usuario activo" : "Usuario bloqueado",
               style: const TextStyle(

@@ -276,10 +276,10 @@ class _UserCreateScreenState extends State<UserCreateScreen> {
               children: [
                 _heroTextBlock(),
                 const SizedBox(height: 14),
-                Wrap(
+                const Wrap(
                   spacing: 10,
                   runSpacing: 10,
-                  children: const [
+                  children: [
                     _HeroChip(
                       title: "Acceso",
                       value: "Nuevo",
@@ -486,7 +486,7 @@ class _UserCreateScreenState extends State<UserCreateScreen> {
 
   Widget _buildRoleField() {
     return DropdownButtonFormField<String>(
-      value: role,
+      initialValue: role,
       decoration: _inputDecoration(
         label: "Rol",
         hint: "Selecciona un rol",
@@ -548,7 +548,7 @@ class _UserCreateScreenState extends State<UserCreateScreen> {
           SwitchListTile(
             value: isActive,
             contentPadding: EdgeInsets.zero,
-            activeColor: _success,
+            activeThumbColor: _success,
             title: Text(
               isActive ? "Usuario activo" : "Usuario bloqueado",
               style: const TextStyle(

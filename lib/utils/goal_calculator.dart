@@ -160,7 +160,7 @@ class GoalCalculator {
 
     // Por ahora dejamos esperado en una lógica simple lineal.
     // Luego si quieres lo mejoramos con fecha de creación real.
-    final expectedProgress = 0.5;
+    const expectedProgress = 0.5;
 
     return (actualProgress, expectedProgress);
   }

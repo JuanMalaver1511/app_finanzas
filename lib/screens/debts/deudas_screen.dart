@@ -457,7 +457,7 @@ class _DeudasScreenState extends State<DeudasScreen>
               const TextStyle(fontWeight: FontWeight.w400, fontSize: 13),
           dividerColor: Colors.transparent,
           splashFactory: NoSplash.splashFactory,
-          overlayColor: MaterialStateProperty.all(Colors.transparent),
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
           tabs: const [
             Tab(text: 'Deudas'),
             Tab(text: 'Análisis'),
@@ -737,7 +737,7 @@ class _DeudasScreenState extends State<DeudasScreen>
 
     if (isWide) {
       return Padding(
-        padding: EdgeInsets.fromLTRB(40, 0, 40, 14),
+        padding: const EdgeInsets.fromLTRB(40, 0, 40, 14),
         child: Row(
           children: [
             Expanded(
@@ -839,8 +839,8 @@ class _DeudasScreenState extends State<DeudasScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Filtros activos',
-                                  style: const TextStyle(
+                              const Text('Filtros activos',
+                                  style: TextStyle(
                                       fontSize: 10,
                                       color: kGrey,
                                       fontWeight: FontWeight.w500)),
@@ -950,8 +950,8 @@ class _DeudasScreenState extends State<DeudasScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Tipo de deuda',
-                        style: const TextStyle(
+                    const Text('Tipo de deuda',
+                        style: TextStyle(
                             fontSize: 12,
                             color: kGrey,
                             fontWeight: FontWeight.w600,
@@ -1004,8 +1004,8 @@ class _DeudasScreenState extends State<DeudasScreen>
                       }).toList(),
                     ),
                     const SizedBox(height: 24),
-                    Text('Ordenar por',
-                        style: const TextStyle(
+                    const Text('Ordenar por',
+                        style: TextStyle(
                             fontSize: 12,
                             color: kGrey,
                             fontWeight: FontWeight.w600,
@@ -1089,10 +1089,9 @@ class _DeudasScreenState extends State<DeudasScreen>
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: kRedLight,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(17)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(17)),
               ),
               child: Row(
                 children: [
@@ -1639,8 +1638,9 @@ class _DeudasScreenState extends State<DeudasScreen>
       stream:
           _pagosRef.orderBy('fecha', descending: true).limit(50).snapshots(),
       builder: (context, snap) {
-        if (!snap.hasData)
+        if (!snap.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final pagos =
             snap.data!.docs.map((e) => PagoHistorial.fromDoc(e)).toList();
 
@@ -2502,8 +2502,8 @@ class _DeudasScreenState extends State<DeudasScreen>
                   Container(
                     width: 56,
                     height: 56,
-                    decoration:
-                        BoxDecoration(color: kRedLight, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                        color: kRedLight, shape: BoxShape.circle),
                     child: const Icon(Icons.delete_forever_rounded,
                         color: kRedDark, size: 26),
                   ),
@@ -2559,13 +2559,12 @@ class _DeudasScreenState extends State<DeudasScreen>
                           }
                         },
                   child: isLoading
-                      ? Container(
+                      ? SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(
+                          child: const CircularProgressIndicator(
                             strokeWidth: 3,
-                            valueColor:
-                                const AlwaysStoppedAnimation(Colors.white),
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
                           ),
                         )
                       : const Text('Eliminar'),
@@ -2662,7 +2661,7 @@ class _DeudasScreenState extends State<DeudasScreen>
         Text(label, style: const TextStyle(fontSize: 12, color: kGrey)),
         const SizedBox(height: 5),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           decoration: _inputDeco(),
           isExpanded: true,
           icon: const Icon(Icons.unfold_more_rounded, size: 18, color: kGrey),
@@ -2690,7 +2689,7 @@ class _DeudasScreenState extends State<DeudasScreen>
         Text(label, style: const TextStyle(fontSize: 12, color: kGrey)),
         const SizedBox(height: 5),
         DropdownButtonFormField<int>(
-          value: value,
+          initialValue: value,
           decoration: _inputDeco(),
           isExpanded: true,
           icon: const Icon(Icons.unfold_more_rounded, size: 18, color: kGrey),
@@ -2766,12 +2765,12 @@ class _DeudasScreenState extends State<DeudasScreen>
         ),
         child: Center(
           child: isLoading
-              ? SizedBox(
+              ? const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: const AlwaysStoppedAnimation(Colors.white),
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
                   ),
                 )
               : Text(label,

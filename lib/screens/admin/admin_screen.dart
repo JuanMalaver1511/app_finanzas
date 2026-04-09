@@ -80,7 +80,8 @@ class _AdminScreenState extends State<AdminScreen> {
           referenceDate == null ? 9999 : now.difference(referenceDate).inDays;
 
       if (lastLogin == null) {
-        if (createdAt != null && now.difference(createdAt).inDays <= _inactiveThresholdDays) {
+        if (createdAt != null &&
+            now.difference(createdAt).inDays <= _inactiveThresholdDays) {
           active++;
         } else {
           inactive++;
@@ -409,9 +410,12 @@ class _AdminScreenState extends State<AdminScreen> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    _heroChip("Activos", "${activePercent.toStringAsFixed(1)}%", _success),
-                    _heroChip("Inactivos", "${inactivePercent.toStringAsFixed(1)}%", _warning),
-                    _heroChip("Bloqueados", "${blockedPercent.toStringAsFixed(1)}%", _danger),
+                    _heroChip("Activos", "${activePercent.toStringAsFixed(1)}%",
+                        _success),
+                    _heroChip("Inactivos",
+                        "${inactivePercent.toStringAsFixed(1)}%", _warning),
+                    _heroChip("Bloqueados",
+                        "${blockedPercent.toStringAsFixed(1)}%", _danger),
                   ],
                 ),
               ],
@@ -424,9 +428,12 @@ class _AdminScreenState extends State<AdminScreen> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
-                    _heroChip("Activos", "${activePercent.toStringAsFixed(1)}%", _success),
-                    _heroChip("Inactivos", "${inactivePercent.toStringAsFixed(1)}%", _warning),
-                    _heroChip("Bloqueados", "${blockedPercent.toStringAsFixed(1)}%", _danger),
+                    _heroChip("Activos", "${activePercent.toStringAsFixed(1)}%",
+                        _success),
+                    _heroChip("Inactivos",
+                        "${inactivePercent.toStringAsFixed(1)}%", _warning),
+                    _heroChip("Bloqueados",
+                        "${blockedPercent.toStringAsFixed(1)}%", _danger),
                   ],
                 ),
               ],
@@ -691,9 +698,9 @@ class _AdminScreenState extends State<AdminScreen> {
       child: SafeArea(
         child: Column(
           children: [
-            ListTile(
-              leading: const Icon(Icons.admin_panel_settings_rounded),
-              title: const Text(
+            const ListTile(
+              leading: Icon(Icons.admin_panel_settings_rounded),
+              title: Text(
                 "Kybo Admin",
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),

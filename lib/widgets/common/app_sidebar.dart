@@ -129,10 +129,10 @@ class AppSidebar extends StatelessWidget {
             },
 
             // ESTE ES EL FIX
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 14),
+            child: const Padding(
+              padding: EdgeInsets.only(bottom: 14),
               child: Column(
-                children: const [
+                children: [
                   Icon(Icons.logout, color: Colors.white70),
                   SizedBox(height: 4),
                   Text(
