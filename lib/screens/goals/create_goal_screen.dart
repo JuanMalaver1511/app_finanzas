@@ -561,7 +561,7 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
   }
 
   Widget _buildFrequencySelector(bool isMobile) {
-    final options = GoalSavingFrequency.values;
+    const options = GoalSavingFrequency.values;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

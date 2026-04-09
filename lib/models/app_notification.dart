@@ -10,9 +10,9 @@ class AppNotification {
   final String source;
 
   final DateTime? createdAt;
-  final DateTime? expiresAt; 
+  final DateTime? expiresAt;
 
-  final String? dedupeKey; 
+  final String? dedupeKey;
 
   AppNotification({
     required this.id,
@@ -31,7 +31,7 @@ class AppNotification {
     String id,
     Map<String, dynamic> data,
   ) {
-    DateTime? _parseDate(dynamic value) {
+    DateTime? parseDate(dynamic value) {
       if (value is Timestamp) return value.toDate();
       return null;
     }
@@ -44,8 +44,8 @@ class AppNotification {
       priority: (data['priority'] ?? 'low').toString(),
       isRead: data['isRead'] == true,
       source: (data['source'] ?? 'system').toString(),
-      createdAt: _parseDate(data['createdAt']),
-      expiresAt: _parseDate(data['expiresAt']), 
+      createdAt: parseDate(data['createdAt']),
+      expiresAt: parseDate(data['expiresAt']),
       dedupeKey: data['dedupeKey']?.toString(),
     );
   }

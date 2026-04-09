@@ -167,9 +167,9 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     final balanceLabel = isPositive ? 'Superávit' : 'Déficit';
     final balanceIcon =
         isPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded;
-    final debtColor = _kRedDark;
-    final debtBg = _kRedLight;
-    final debtIcon = Icons.credit_card_rounded;
+    const debtColor = _kRedDark;
+    const debtBg = _kRedLight;
+    const debtIcon = Icons.credit_card_rounded;
 
     showDialog(
       context: context,
