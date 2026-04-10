@@ -114,21 +114,24 @@ class _IAInsightButtonState extends State<IAInsightButton> {
 
       if (!mounted) return;
 
-      if (kIsWeb) {
-        _showInsightDialog(
-          mes: mes,
+      // Programar notificación diaria en Android con datos frescos
+      if (!kIsWeb) {
+        await noti.programarNotificacionDiaria(
+          balance: balance,
           ingresos: ingresos,
           gastos: gastos,
-          balance: balance,
-          deudas: deudas,
-          respuesta: respuesta,
-        );
-      } else {
-        await noti.mostrarNotificacion(
-          '${_nombreMes(mes)} - Análisis financiero',
-          respuesta,
         );
       }
+
+      // Siempre mostrar el modal bonito (web y Android)
+      _showInsightDialog(
+        mes: mes,
+        ingresos: ingresos,
+        gastos: gastos,
+        balance: balance,
+        deudas: deudas,
+        respuesta: respuesta,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -161,6 +164,7 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     required double deudas,
     required String respuesta,
   }) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     final isPositive = balance >= 0;
     final balanceColor = isPositive ? _kGreenDark : _kRedDark;
     final balanceBg = isPositive ? _kGreenLight : _kRedLight;
@@ -175,8 +179,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
       context: context,
       barrierColor: Colors.black54,
       builder: (dialogCtx) {
-        final isMobile = MediaQuery.of(context).size.width < 600;
-
         return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: EdgeInsets.symmetric(
@@ -256,7 +258,7 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                     ),
                   ),
 
-                  // ── Métricas: columna en móvil, fila en web ───────────────
+                  // ── Métricas ─────────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                     child: isMobile
@@ -440,7 +442,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     );
   }
 
-  // ── Tile vertical — web (en fila de 3) ───────────────────────────────────
   Widget _metricTileV({
     required String label,
     required String value,
@@ -482,7 +483,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     );
   }
 
-  // ── Tile horizontal — móvil (apilado, ancho completo) ────────────────────
   Widget _metricTileH({
     required String label,
     required String value,
@@ -523,7 +523,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     );
   }
 
-  // ── Botón principal — sin animación ──────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

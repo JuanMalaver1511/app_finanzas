@@ -63,18 +63,21 @@ class AuthService {
         );
 
         final userCredential = await _auth.signInWithCredential(credential);
+
+        // Esperar a que Firebase confirme el usuario
+        await _auth.authStateChanges().firstWhere((user) => user != null);
+
         return userCredential.user;
       }
     } on FirebaseAuthException catch (e) {
       if (e.code == 'popup-closed-by-user') return null;
       throw Exception(_mapError(e.code));
     } catch (e) {
-      // Ignorar error de COOP que no impide el login
       final errStr = e.toString().toLowerCase();
       if (errStr.contains('cross-origin') ||
           errStr.contains('window.close') ||
           errStr.contains('coop')) {
-        return _auth.currentUser; // El usuario YA está logueado
+        return _auth.currentUser;
       }
       throw Exception("Error con Google");
     }
