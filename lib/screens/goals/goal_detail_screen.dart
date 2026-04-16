@@ -4,6 +4,7 @@ import '../../models/goal_contribution_model.dart';
 import '../../models/goal_model.dart';
 import '../../services/goal_service.dart';
 import '../../utils/goal_calculator.dart';
+import 'create_goal_screen.dart';
 import 'dialogs/add_goal_contribution_dialog.dart';
 
 const kAmber = Color(0xFFFFBB4E);
@@ -300,7 +301,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(_statusIcon(goal.status), color: statusColor, size: 16),
+                        Icon(_statusIcon(goal.status),
+                            color: statusColor, size: 16),
                         const SizedBox(width: 6),
                         Text(
                           GoalCalculator.statusLabel(goal.status),
@@ -386,7 +388,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
         final crossAxisCount = isMobile ? 2 : 4;
         final spacing = isMobile ? 12.0 : 14.0;
         final totalSpacing = spacing * (crossAxisCount - 1);
-        final itemWidth = (constraints.maxWidth - totalSpacing) / crossAxisCount;
+        final itemWidth =
+            (constraints.maxWidth - totalSpacing) / crossAxisCount;
 
         return GridView.builder(
           itemCount: items.length,
@@ -587,39 +590,157 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   }
 
   Widget _buildActions(GoalModel goal, bool isMobile) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _isSavingContribution ? null : () => _openAddContribution(goal),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: kGreenBtn,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor: kGreenBtn.withOpacity(0.55),
-          elevation: 0,
-          minimumSize: const Size.fromHeight(56),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed:
+                _isSavingContribution ? null : () => _openAddContribution(goal),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kGreenBtn,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: kGreenBtn.withOpacity(0.55),
+              elevation: 0,
+              minimumSize: const Size.fromHeight(56),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            icon: _isSavingContribution
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.add_rounded),
+            label: Text(
+              _isSavingContribution ? 'Guardando...' : 'Agregar aporte',
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14.5,
+              ),
+            ),
           ),
         ),
-        icon: _isSavingContribution
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: Colors.white,
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _openEditGoal(goal),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kDark,
+                  side: BorderSide(color: kDark.withOpacity(0.18)),
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
                 ),
-              )
-            : const Icon(Icons.add_rounded),
-        label: Text(
-          _isSavingContribution ? 'Guardando...' : 'Agregar aporte',
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 14.5,
-          ),
+                icon: const Icon(Icons.edit_rounded),
+                label: const Text(
+                  'Editar meta',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmDeleteGoal(goal),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kRed,
+                  side: BorderSide(color: kRed.withOpacity(0.25)),
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text(
+                  'Eliminar meta',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+      ],
+    );
+  }
+
+  Future<void> _openEditGoal(GoalModel goal) async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CreateGoalScreen(goal: goal),
       ),
     );
+
+    if (!mounted) return;
+
+    if (result == 'updated') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: kGreenBtn,
+          content: Text('Meta actualizada correctamente.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteGoal(GoalModel goal) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar meta'),
+        content: const Text(
+          '¿Estás seguro de que quieres eliminar esta meta? Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: kRed),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete != true) return;
+
+    try {
+      await _goalService.deleteGoal(goal.id);
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop('deleted');
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: kRed,
+          content: Text('No se pudo eliminar la meta: $e'),
+        ),
+      );
+    }
   }
 
   Widget _buildContributionsSection(
