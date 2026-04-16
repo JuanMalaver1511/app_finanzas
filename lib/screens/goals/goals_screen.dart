@@ -89,11 +89,22 @@ class _GoalsScreenState extends State<GoalsScreen> {
     }
   }
 
-  void _openGoalDetail(GoalModel goal) {
-    Navigator.push(
+  Future<void> _openGoalDetail(GoalModel goal) async {
+    final result = await Navigator.push<String>(
       context,
       _buildAnimatedRoute(GoalDetailScreen(goalId: goal.id)),
     );
+
+    if (!mounted) return;
+
+    if (result == 'deleted') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: kRed,
+          content: Text('Meta eliminada correctamente.'),
+        ),
+      );
+    }
   }
 
   void _showHelpDialog() {

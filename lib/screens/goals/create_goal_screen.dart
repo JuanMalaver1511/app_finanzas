@@ -21,7 +21,9 @@ const kRed = Color(0xFFE74C3C);
 const kAmberLight = Color(0xFFFFF3DC);
 
 class CreateGoalScreen extends StatefulWidget {
-  const CreateGoalScreen({super.key});
+  const CreateGoalScreen({super.key, this.goal});
+
+  final GoalModel? goal;
 
   @override
   State<CreateGoalScreen> createState() => _CreateGoalScreenState();
@@ -38,11 +40,13 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
   final GoalService _goalService = GoalService();
   final ImagePicker _imagePicker = ImagePicker();
 
+  late final bool _isEditMode;
   GoalSavingFrequency _selectedFrequency = GoalSavingFrequency.monthly;
   DateTime? _selectedDeadline;
   bool _isSaving = false;
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
+  String? _existingImageUrl;
 
   @override
   void dispose() {
@@ -69,9 +73,34 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
     );
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _isEditMode = widget.goal != null;
+
+    if (_isEditMode) {
+      final goal = widget.goal!;
+      _titleController.text = goal.title;
+      _targetAmountController.text = _amountToInputValue(goal.targetAmount);
+      _selectedDeadline = goal.deadline;
+      _selectedFrequency = goal.savingFrequency;
+      _motivationController.text = goal.motivation ?? '';
+      _existingImageUrl = goal.imageUrl;
+      _initialSavedAmountController.text =
+          _amountToInputValue(goal.savedAmount);
+    }
+  }
+
   double _parseAmount(String value) {
     final clean = value.replaceAll('.', '').replaceAll(',', '.').trim();
     return double.tryParse(clean) ?? 0;
+  }
+
+  String _amountToInputValue(double value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+    return value.toString();
   }
 
   String _formatCurrency(double value) {
@@ -176,7 +205,7 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
   }
 
   Future<String?> _uploadGoalImage() async {
-    if (_selectedImageBytes == null) return null;
+    if (_selectedImageBytes == null) return _existingImageUrl;
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -219,6 +248,23 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
 
     try {
       final imageUrl = await _uploadGoalImage();
+
+      if (_isEditMode) {
+        await _goalService.updateGoal(
+          goalId: widget.goal!.id,
+          title: _titleController.text.trim(),
+          targetAmount: _targetAmount,
+          deadline: _selectedDeadline!,
+          savingFrequency: _selectedFrequency,
+          imageUrl: imageUrl,
+          motivation: _motivationController.text.trim(),
+        );
+
+        if (!mounted) return;
+
+        Navigator.pop(context, 'updated');
+        return;
+      }
 
       await _goalService.createGoal(
         title: _titleController.text.trim(),
@@ -302,7 +348,7 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Crear Meta',
+              _isEditMode ? 'Editar Meta' : 'Crear Meta',
               style: TextStyle(
                 color: kDark,
                 fontWeight: FontWeight.w800,
@@ -375,7 +421,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
   }
 
   Widget _buildImageSection(bool isMobile) {
-    final hasImage = _selectedImageBytes != null;
+    final hasImage = _selectedImageBytes != null ||
+        (_existingImageUrl != null && _existingImageUrl!.trim().isNotEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,12 +457,33 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(22),
-                        child: Image.memory(
-                          _selectedImageBytes!,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                        ),
+                        child: _selectedImageBytes != null
+                            ? Image.memory(
+                                _selectedImageBytes!,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.network(
+                                _existingImageUrl!,
+                                width: double.infinity,
+                                height: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    color: Colors.grey.shade200,
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.broken_image_rounded,
+                                        size: 48,
+                                        color: kGrey,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                       ),
                       Positioned(
                         right: 12,
@@ -425,6 +493,7 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                             setState(() {
                               _selectedImageBytes = null;
                               _selectedImageName = null;
+                              _existingImageUrl = null;
                             });
                           },
                           child: Container(
@@ -859,9 +928,9 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                   color: Colors.white,
                 ),
               )
-            : const Text(
-                'Guardar meta',
-                style: TextStyle(
+            : Text(
+                _isEditMode ? 'Guardar cambios' : 'Guardar meta',
+                style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -958,31 +1027,34 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 18),
-                                _buildTextField(
-                                  controller: _initialSavedAmountController,
-                                  label: '¿Ya llevas algo ahorrado? (opcional)',
-                                  hint: 'Ej: 200000',
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
-                                  validator: (value) {
-                                    final amount = _parseAmount(value ?? '');
-                                    if (amount < 0) {
-                                      return 'El valor no puede ser negativo.';
-                                    }
-                                    if (_targetAmount > 0 &&
-                                        amount > _targetAmount) {
-                                      return 'No puede ser mayor al monto objetivo.';
-                                    }
-                                    return null;
-                                  },
-                                  onChanged: (_) => setState(() {}),
-                                  prefixIcon: const Icon(
-                                    Icons.account_balance_wallet_rounded,
-                                    color: kDark,
+                                if (!_isEditMode) ...[
+                                  _buildTextField(
+                                    controller: _initialSavedAmountController,
+                                    label:
+                                        '¿Ya llevas algo ahorrado? (opcional)',
+                                    hint: 'Ej: 200000',
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    validator: (value) {
+                                      final amount = _parseAmount(value ?? '');
+                                      if (amount < 0) {
+                                        return 'El valor no puede ser negativo.';
+                                      }
+                                      if (_targetAmount > 0 &&
+                                          amount > _targetAmount) {
+                                        return 'No puede ser mayor al monto objetivo.';
+                                      }
+                                      return null;
+                                    },
+                                    onChanged: (_) => setState(() {}),
+                                    prefixIcon: const Icon(
+                                      Icons.account_balance_wallet_rounded,
+                                      color: kDark,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 18),
+                                  const SizedBox(height: 18),
+                                ],
                                 _buildDeadlineSelector(),
                                 const SizedBox(height: 18),
                                 _buildFrequencySelector(isMobile),
