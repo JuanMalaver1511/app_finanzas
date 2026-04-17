@@ -168,6 +168,25 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     });
   }
 
+  void _formatAmount(String value) {
+    final clean = value.replaceAll('.', '').replaceAll(',', '');
+
+    if (clean.isEmpty) {
+      _amountCtrl.value = const TextEditingValue(text: '');
+      return;
+    }
+
+    final number = int.tryParse(clean);
+    if (number == null) return;
+
+    final formatted = NumberFormat('#,###', 'es_CO').format(number);
+
+    _amountCtrl.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
   void _pickEmoji() {
     if (kIsWeb) {
       _openEmojiGrid();
@@ -291,7 +310,8 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   }
 
   Future<void> _save() async {
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.'));
+    final clean = _amountCtrl.text.replaceAll('.', '');
+    final amount = double.tryParse(clean);
 
     if (_titleCtrl.text.trim().isEmpty) {
       _error("Escribe una descripción");
@@ -970,7 +990,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                     ],
-                    onChanged: (_) => setState(() {}),
+                    onChanged: _formatAmount,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                       hintText: "Ej: 120000",

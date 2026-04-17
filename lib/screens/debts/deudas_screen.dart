@@ -84,7 +84,10 @@ class Debt {
 
   double get interesEstimadoMensual => saldoActual * (interes / 100) / 12;
 
-  bool get estaVencida => DateTime.now().day > diaPago + 3;
+  bool get estaVencida {
+    final hoy = DateTime.now().day;
+    return saldoActual > 0 && hoy > (diaPago + 3);
+  }
 
   Color get tipoColor {
     switch (tipo) {
@@ -169,6 +172,45 @@ class DeudasScreen extends StatefulWidget {
   State<DeudasScreen> createState() => _DeudasScreenState();
 }
 
+void _formatAmountInput(TextEditingController controller, String value) {
+  final clean = value.replaceAll('.', '').replaceAll(',', '').trim();
+
+  if (clean.isEmpty) {
+    controller.value = const TextEditingValue(text: '');
+    return;
+  }
+
+  final number = int.tryParse(clean);
+  if (number == null) return;
+
+  final formatted = _formatThousands(number);
+
+  controller.value = TextEditingValue(
+    text: formatted,
+    selection: TextSelection.collapsed(offset: formatted.length),
+  );
+}
+
+String _formatThousands(int value) {
+  final text = value.toString();
+  final buffer = StringBuffer();
+
+  for (int i = 0; i < text.length; i++) {
+    final indexFromEnd = text.length - i;
+    buffer.write(text[i]);
+    if (indexFromEnd > 1 && indexFromEnd % 3 == 1) {
+      buffer.write('.');
+    }
+  }
+
+  return buffer.toString();
+}
+
+double _parseMoneyInput(String value) {
+  final clean = value.replaceAll('.', '').replaceAll(',', '.').trim();
+  return double.tryParse(clean) ?? 0;
+}
+
 class _DeudasScreenState extends State<DeudasScreen>
     with SingleTickerProviderStateMixin {
   final user = FirebaseAuth.instance.currentUser;
@@ -201,12 +243,36 @@ class _DeudasScreenState extends State<DeudasScreen>
   }
 
   // ─── FORMATEAR NÚMERO ─────────────────────────────────────────────────────
-  String fmt(double v) {
-    final abs = v.abs();
-    if (abs >= 1000000) {
-      return '\$${(v / 1000000).toStringAsFixed(1)}M';
+  String fmt(double value) {
+    final isNegative = value < 0;
+    final absValue = value.abs().round().toString();
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < absValue.length; i++) {
+      final indexFromEnd = absValue.length - i;
+      buffer.write(absValue[i]);
+      if (indexFromEnd > 1 && indexFromEnd % 3 == 1) {
+        buffer.write('.');
+      }
     }
-    return '\$${v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+
+    return '${isNegative ? '-\$' : '\$'}${buffer.toString()}';
+  }
+
+  String fmtCompact(double value) {
+    final abs = value.abs();
+
+    if (abs >= 1000000000) {
+      return '\$${(value / 1000000000).toStringAsFixed(1)}B';
+    }
+    if (abs >= 1000000) {
+      return '\$${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    if (abs >= 1000) {
+      return '\$${(value / 1000).toStringAsFixed(1)}K';
+    }
+
+    return fmt(value);
   }
 
   // ─── DETECTAR SI ES WEB/TABLET ───────────────────────────────────────────
@@ -297,7 +363,14 @@ class _DeudasScreenState extends State<DeudasScreen>
       child: Row(
         children: [
           GestureDetector(
-            onTap: () => Navigator.pushNamed(context, '/'),
+            onTap: () {
+              final navigator = Navigator.of(context);
+              if (navigator.canPop()) {
+                navigator.pop();
+                return;
+              }
+              Navigator.pushNamed(context, '/');
+            },
             child: Container(
               width: 38,
               height: 38,
@@ -593,9 +666,9 @@ class _DeudasScreenState extends State<DeudasScreen>
                   spacing: 20,
                   runSpacing: 10,
                   children: [
-                    _miniStat('Cuota mensual', fmt(cuotaTotal)),
+                    _miniStat('Pago mensual total', fmt(cuotaTotal)),
                     _miniStat('Próximo pago', 'Día $diasMin'),
-                    _miniStat('Total deudas', '${debts.length}'),
+                    _miniStat('Deudas activas', '${debts.length}'),
                   ],
                 ),
               ],
@@ -1264,13 +1337,11 @@ class _DeudasScreenState extends State<DeudasScreen>
           const SizedBox(height: 8),
           Row(
             children: [
-              _statChip(
-                  Icons.loop_rounded, 'Cuotas rest.', '${d.mesesRestantes}'),
-              const SizedBox(width: 8),
-              _statChip(Icons.savings_outlined, 'Int. mensual',
+              _statChip(Icons.loop_rounded, 'Cuotas restantes',
+                  '${d.mesesRestantes}'),
+              _statChip(Icons.savings_outlined, 'Interés estimado',
                   fmt(d.interesEstimadoMensual)),
-              const SizedBox(width: 8),
-              _statChip(Icons.pie_chart_outline_rounded, 'Avance',
+              _statChip(Icons.pie_chart_outline_rounded, 'Progreso',
                   '${(d.progreso * 100).toStringAsFixed(0)}%'),
             ],
           ),
@@ -1763,7 +1834,7 @@ class _DeudasScreenState extends State<DeudasScreen>
 
     // Función para calcular cuota mensual con interés
     void calcularCuota() {
-      final montoVal = double.tryParse(monto.text) ?? 0;
+      final montoVal = _parseMoneyInput(monto.text);
       final interesVal = double.tryParse(interes.text) ?? 0;
       final numCuotasVal = int.tryParse(numCuotasCtrl.text) ?? 12;
 
@@ -1774,14 +1845,14 @@ class _DeudasScreenState extends State<DeudasScreen>
 
       if (interesVal == 0) {
         final cuotaSimple = montoVal / numCuotasVal;
-        cuota.text = cuotaSimple.toStringAsFixed(0);
+        cuota.text = _formatThousands(cuotaSimple.round());
       } else {
         final tasaMensual = (interesVal / 100) / 12;
         final numerador =
             montoVal * tasaMensual * pow(1 + tasaMensual, numCuotasVal);
         final denominador = pow(1 + tasaMensual, numCuotasVal) - 1;
         final cuotaConInteres = numerador / denominador;
-        cuota.text = cuotaConInteres.toStringAsFixed(0);
+        cuota.text = _formatThousands(cuotaConInteres.round());
       }
     }
 
@@ -1827,34 +1898,42 @@ class _DeudasScreenState extends State<DeudasScreen>
                   Row(children: [
                     Expanded(
                         child: _field('Monto total', monto,
-                            hint: '0',
-                            isNumber: true,
-                            onChanged: (_) => setM(calcularCuota),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Monto obligatorio';
-                              }
-                              final parsed =
-                                  double.tryParse(value.replaceAll(',', '.'));
-                              if (parsed == null || parsed <= 0) {
-                                return 'Ingresa un monto válido';
-                              }
-                              return null;
-                            })),
-                    const SizedBox(width: 10),
-                    Expanded(
-                        child: _field('Saldo actual', saldo,
-                            hint: '0', isNumber: true, validator: (value) {
+                            hint: 'Ej: 12.000.000',
+                            isNumber: true, onChanged: (value) {
+                      _formatAmountInput(monto, value);
+                      setM(calcularCuota);
+                    }, validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Saldo obligatorio';
+                        return 'Monto obligatorio';
                       }
-                      final parsed =
-                          double.tryParse(value.replaceAll(',', '.'));
-                      if (parsed == null || parsed < 0) {
-                        return 'Ingresa un saldo válido';
+                      final parsed = _parseMoneyInput(value ?? '');
+                      if (parsed == null || parsed <= 0) {
+                        return 'Ingresa un monto válido';
                       }
                       return null;
                     })),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _field(
+                        'Saldo actual',
+                        saldo,
+                        hint: 'Ej: 8.500.000',
+                        isNumber: true,
+                        onChanged: (value) {
+                          _formatAmountInput(saldo, value);
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Saldo obligatorio';
+                          }
+                          final parsed = _parseMoneyInput(value);
+                          if (parsed < 0) {
+                            return 'Ingresa un saldo válido';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
                   ]),
                   const SizedBox(height: 10),
                   Row(children: [
@@ -1947,17 +2026,25 @@ class _DeudasScreenState extends State<DeudasScreen>
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _field('Cuota mensual', cuota, hint: '0', isNumber: true,
-                      validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Cuota obligatoria';
-                    }
-                    final parsed = double.tryParse(value.replaceAll(',', '.'));
-                    if (parsed == null || parsed <= 0) {
-                      return 'Ingresa una cuota válida';
-                    }
-                    return null;
-                  }),
+                  _field(
+                    'Cuota mensual',
+                    cuota,
+                    hint: 'Ej: 450.000',
+                    isNumber: true,
+                    onChanged: (value) {
+                      _formatAmountInput(cuota, value);
+                    },
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Cuota obligatoria';
+                      }
+                      final parsed = _parseMoneyInput(value);
+                      if (parsed <= 0) {
+                        return 'Ingresa una cuota válida';
+                      }
+                      return null;
+                    },
+                  ),
                   const SizedBox(height: 16),
                   Row(children: [
                     Expanded(child: _cancelBtn(() {
@@ -1972,15 +2059,9 @@ class _DeudasScreenState extends State<DeudasScreen>
                         setM(() => isLoading = true);
                         try {
                           final n = nombre.text.trim();
-                          final m = double.tryParse(
-                                  monto.text.replaceAll(',', '.')) ??
-                              0;
-                          final s = double.tryParse(
-                                  saldo.text.replaceAll(',', '.')) ??
-                              m;
-                          final c = double.tryParse(
-                                  cuota.text.replaceAll(',', '.')) ??
-                              0;
+                          final m = _parseMoneyInput(monto.text);
+                          final s = _parseMoneyInput(saldo.text);
+                          final c = _parseMoneyInput(cuota.text);
                           final ii = double.tryParse(
                                   interes.text.replaceAll(',', '.')) ??
                               0;
@@ -2011,10 +2092,12 @@ class _DeudasScreenState extends State<DeudasScreen>
 
   void _showEditarDeuda(Debt d) {
     final nombre = TextEditingController(text: d.nombre);
-    final monto = TextEditingController(text: d.montoTotal.toStringAsFixed(0));
-    final saldo = TextEditingController(text: d.saldoActual.toStringAsFixed(0));
+    final monto =
+        TextEditingController(text: _formatThousands(d.montoTotal.round()));
+    final saldo =
+        TextEditingController(text: _formatThousands(d.saldoActual.round()));
     final cuota =
-        TextEditingController(text: d.cuotaMensual.toStringAsFixed(0));
+        TextEditingController(text: _formatThousands(d.cuotaMensual.round()));
     final interes = TextEditingController(text: d.interes.toStringAsFixed(1));
     String tipo = d.tipo;
     int diaPago = d.diaPago;
@@ -2031,37 +2114,54 @@ class _DeudasScreenState extends State<DeudasScreen>
             children: [
               _field('Nombre', nombre),
               const SizedBox(height: 14),
-              Row(children: [
-                Expanded(
-                    child: _dropdownField(
-                        'Tipo',
-                        tipo,
-                        ['personal', 'tarjeta', 'hipoteca', 'vehiculo'],
-                        ['Personal', 'Tarjeta', 'Hipoteca', 'Vehículo'],
-                        (v) => setM(() => tipo = v ?? d.tipo))),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _dropdownIntField(
-                        'Día de pago',
-                        diaPago,
-                        List.generate(28, (i) => i + 1),
-                        List.generate(28, (i) => 'Día ${i + 1}'),
-                        (v) => setM(() => diaPago = v ?? d.diaPago))),
-              ]),
+              Row(
+                children: [
+                  Expanded(
+                    child: _field(
+                      'Monto original',
+                      monto,
+                      isNumber: true,
+                      onChanged: (value) {
+                        _formatAmountInput(monto, value);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _field(
+                      'Saldo actual',
+                      saldo,
+                      isNumber: true,
+                      onChanged: (value) {
+                        _formatAmountInput(saldo, value);
+                      },
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 14),
-              Row(children: [
-                Expanded(
-                    child: _field('Monto original', monto, isNumber: true)),
-                const SizedBox(width: 12),
-                Expanded(child: _field('Saldo actual', saldo, isNumber: true)),
-              ]),
-              const SizedBox(height: 14),
-              Row(children: [
-                Expanded(child: _field('Cuota mensual', cuota, isNumber: true)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _field('Interés anual %', interes, isNumber: true)),
-              ]),
+              Row(
+                children: [
+                  Expanded(
+                    child: _field(
+                      'Cuota mensual',
+                      cuota,
+                      isNumber: true,
+                      onChanged: (value) {
+                        _formatAmountInput(cuota, value);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _field(
+                      'Interés anual %',
+                      interes,
+                      isNumber: true,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 22),
               Row(children: [
                 Expanded(child: _cancelBtn(() => Navigator.pop(context))),
@@ -2075,12 +2175,9 @@ class _DeudasScreenState extends State<DeudasScreen>
                       await _debtsRef.doc(d.id).update({
                         'nombre': nombre.text.trim(),
                         'tipo': tipo,
-                        'monto_total':
-                            double.tryParse(monto.text) ?? d.montoTotal,
-                        'saldo_actual':
-                            double.tryParse(saldo.text) ?? d.saldoActual,
-                        'cuota_mensual':
-                            double.tryParse(cuota.text) ?? d.cuotaMensual,
+                        'monto_total': _parseMoneyInput(monto.text),
+                        'saldo_actual': _parseMoneyInput(saldo.text),
+                        'cuota_mensual': _parseMoneyInput(cuota.text),
                         'dia_pago': diaPago,
                         'interes': double.tryParse(interes.text) ?? d.interes,
                       });
@@ -2100,7 +2197,7 @@ class _DeudasScreenState extends State<DeudasScreen>
 
   void _showPagoModal(Debt d) {
     final montoCtrl =
-        TextEditingController(text: d.cuotaMensual.toStringAsFixed(0));
+        TextEditingController(text: _formatThousands(d.cuotaMensual.round()));
     bool isLoading = false;
 
     showDialog(
@@ -2129,26 +2226,35 @@ class _DeudasScreenState extends State<DeudasScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              _field('Monto del pago', montoCtrl, isNumber: true),
+              _field(
+                'Monto del pago',
+                montoCtrl,
+                isNumber: true,
+                onChanged: (value) {
+                  _formatAmountInput(montoCtrl, value);
+                },
+              ),
               const SizedBox(height: 12),
               Row(children: [
                 _quickBtn(
                     'Cuota exacta',
                     () => setM(() {
-                          montoCtrl.text = d.cuotaMensual.toStringAsFixed(0);
+                          montoCtrl.text =
+                              _formatThousands(d.cuotaMensual.round());
                         })),
                 const SizedBox(width: 8),
                 _quickBtn(
                     'Doble cuota',
                     () => setM(() {
                           montoCtrl.text =
-                              (d.cuotaMensual * 2).toStringAsFixed(0);
+                              _formatThousands((d.cuotaMensual * 2).round());
                         })),
                 const SizedBox(width: 8),
                 _quickBtn(
                     'Pago total',
                     () => setM(() {
-                          montoCtrl.text = d.saldoActual.toStringAsFixed(0);
+                          montoCtrl.text =
+                              _formatThousands(d.saldoActual.round());
                         })),
               ]),
               const SizedBox(height: 22),
@@ -2163,7 +2269,7 @@ class _DeudasScreenState extends State<DeudasScreen>
                     if (isLoading) return;
                     setM(() => isLoading = true);
                     try {
-                      final pago = double.tryParse(montoCtrl.text) ?? 0;
+                      final pago = _parseMoneyInput(montoCtrl.text);
                       if (pago <= 0) {
                         setM(() => isLoading = false);
                         return;

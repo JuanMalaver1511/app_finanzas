@@ -97,10 +97,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
   }
 
   String _amountToInputValue(double value) {
-    if (value % 1 == 0) {
-      return value.toInt().toString();
-    }
-    return value.toString();
+    final intValue = value.round();
+    return _formatThousands(intValue);
   }
 
   String _formatCurrency(double value) {
@@ -136,6 +134,40 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
     ];
 
     return '${date.day} de ${months[date.month - 1]} de ${date.year}';
+  }
+
+  void _formatAmountInput(TextEditingController controller, String value) {
+    final clean = value.replaceAll('.', '').replaceAll(',', '').trim();
+
+    if (clean.isEmpty) {
+      controller.value = const TextEditingValue(text: '');
+      return;
+    }
+
+    final number = int.tryParse(clean);
+    if (number == null) return;
+
+    final formatted = _formatThousands(number);
+
+    controller.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+
+  String _formatThousands(int value) {
+    final text = value.toString();
+    final buffer = StringBuffer();
+
+    for (int i = 0; i < text.length; i++) {
+      final indexFromEnd = text.length - i;
+      buffer.write(text[i]);
+      if (indexFromEnd > 1 && indexFromEnd % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+
+    return buffer.toString();
   }
 
   Future<void> _pickDeadline() async {
@@ -1009,10 +1041,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                 _buildTextField(
                                   controller: _targetAmountController,
                                   label: 'Monto objetivo',
-                                  hint: 'Ej: 1500000',
-                                  keyboardType:
-                                      const TextInputType.numberWithOptions(
-                                          decimal: true),
+                                  hint: 'Ej: 1.500.000',
+                                  keyboardType: TextInputType.number,
                                   validator: (value) {
                                     final amount = _parseAmount(value ?? '');
                                     if (amount <= 0) {
@@ -1020,7 +1050,11 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                     }
                                     return null;
                                   },
-                                  onChanged: (_) => setState(() {}),
+                                  onChanged: (value) {
+                                    _formatAmountInput(
+                                        _targetAmountController, value);
+                                    setState(() {});
+                                  },
                                   prefixIcon: const Icon(
                                     Icons.attach_money_rounded,
                                     color: kDark,
@@ -1032,10 +1066,8 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                     controller: _initialSavedAmountController,
                                     label:
                                         '¿Ya llevas algo ahorrado? (opcional)',
-                                    hint: 'Ej: 200000',
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                            decimal: true),
+                                    hint: 'Ej: 200.000',
+                                    keyboardType: TextInputType.number,
                                     validator: (value) {
                                       final amount = _parseAmount(value ?? '');
                                       if (amount < 0) {
@@ -1047,7 +1079,11 @@ class _CreateGoalScreenState extends State<CreateGoalScreen> {
                                       }
                                       return null;
                                     },
-                                    onChanged: (_) => setState(() {}),
+                                    onChanged: (value) {
+                                      _formatAmountInput(
+                                          _initialSavedAmountController, value);
+                                      setState(() {});
+                                    },
                                     prefixIcon: const Icon(
                                       Icons.account_balance_wallet_rounded,
                                       color: kDark,
