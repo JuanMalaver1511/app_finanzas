@@ -8,6 +8,7 @@ const kCard = Colors.white;
 const kDark = Color(0xFF1A1A2E);
 const kGrey = Color(0xFF8A8A9A);
 const kPrimary = Color(0xFFFFBB4E);
+const kPurple = Color(0xFF6366F1);
 const kRed = Color(0xFFE74C3C);
 const kAmber = Color(0xFFF59E0B);
 const kInfo = Color(0xFF3B82F6);
@@ -45,6 +46,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.error_outline_rounded;
       case 'budget_over_income':
         return Icons.insights_outlined;
+      case 'debt_overdue':
+        return Icons.warning_amber_rounded;
+      case 'debt_upcoming':
+        return Icons.calendar_today_rounded;
+      case 'goal_at_risk':
+        return Icons.track_changes_rounded;
+      case 'goal_delayed':
+        return Icons.timelapse_rounded;
+      case 'income_expected':
+        return Icons.payments_outlined;
+      case 'income_received':
+        return Icons.check_circle_outline_rounded;
       case 'admin_message':
         return Icons.campaign_outlined;
       case 'system_update':
@@ -61,14 +74,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'budget_warning':
         return kAmber;
       case 'budget_exceeded':
-        return kRed;
       case 'budget_over_income':
         return kRed;
+      case 'budget_auto_created':
+        return kSuccess;
+      case 'debt_overdue':
+        return kRed;
+      case 'debt_upcoming':
+        return kAmber;
+      case 'goal_at_risk':
+        return kAmber;
+      case 'goal_delayed':
+        return kRed;
+      case 'income_expected':
+        return kInfo;
+      case 'income_received':
+        return kSuccess;
       case 'admin_message':
       case 'system_update':
         return kInfo;
-      case 'budget_auto_created':
-        return kSuccess;
       default:
         return _colorForPriority(n.priority);
     }
@@ -82,15 +106,57 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return kAmber;
       case 'low':
       default:
-        return kPrimary;
+        return kPurple;
     }
   }
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'Ahora';
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final difference = today.difference(target).inDays;
+
+    if (difference == 0) return 'Hoy';
+    if (difference == 1) return 'Ayer';
+
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+
+  String _labelForType(String type) {
+    switch (type) {
+      case 'month_without_budget':
+        return 'Presupuesto';
+      case 'budget_auto_created':
+        return 'Automático';
+      case 'budget_warning':
+        return 'Advertencia';
+      case 'budget_exceeded':
+        return 'Excedido';
+      case 'budget_over_income':
+        return 'Riesgo';
+      case 'debt_overdue':
+        return 'Deuda';
+      case 'debt_upcoming':
+        return 'Próximo pago';
+      case 'goal_at_risk':
+        return 'Meta en riesgo';
+      case 'goal_delayed':
+        return 'Meta atrasada';
+      case 'income_expected':
+        return 'Ingreso';
+      case 'income_received':
+        return 'Confirmado';
+      case 'admin_message':
+        return 'Admin';
+      case 'system_update':
+        return 'Sistema';
+      default:
+        return 'Notificación';
+    }
   }
 
   Widget _tabButton(String text, int index) {
@@ -103,10 +169,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? kPrimary.withOpacity(0.18) : Colors.white,
+          color: selected ? kPrimary.withOpacity(0.16) : Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? kPrimary.withOpacity(0.55) : kGrey.withOpacity(0.18),
+            color:
+                selected ? kPrimary.withOpacity(0.50) : kGrey.withOpacity(0.18),
           ),
           boxShadow: selected
               ? [
@@ -223,8 +290,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: color.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(16),
@@ -255,8 +322,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       ),
                       if (!n.isRead)
                         Container(
-                          width: 8,
-                          height: 8,
+                          width: 9,
+                          height: 9,
                           margin: const EdgeInsets.only(left: 8),
                           decoration: BoxDecoration(
                             color: color,
@@ -275,7 +342,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -295,25 +365,104 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Eliminar',
-                        onPressed: () async {
-                          await _notificationService.delete(n.id);
-                        },
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: kGrey,
-                          size: 20,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          _labelForType(n.type),
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
+                      if (!n.isRead)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Text(
+                            'Nueva',
+                            style: TextStyle(
+                              color: kPurple,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Eliminar',
+              onPressed: () async {
+                await _notificationService.delete(n.id);
+              },
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: kGrey,
+                size: 20,
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _headerSummary(List<AppNotification> all) {
+    final unread = all.where((n) => !n.isRead).length;
+
+    return Container(
+      width: double.infinity,
+      color: kCard,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            unread > 0
+                ? 'Tienes $unread notificación${unread > 1 ? 'es' : ''} sin leer'
+                : 'Todo está al día',
+            style: const TextStyle(
+              color: kDark,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Aquí verás alertas sobre presupuestos, deudas, metas e ingresos.',
+            style: TextStyle(
+              color: kGrey,
+              fontSize: 12.8,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _tabButton('Todas', 0),
+              const SizedBox(width: 10),
+              _tabButton('No leídas', 1),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -354,52 +503,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            color: kCard,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-            child: Row(
-              children: [
-                _tabButton('Todas', 0),
-                const SizedBox(width: 10),
-                _tabButton('No leídas', 1),
-              ],
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<List<AppNotification>>(
-              stream: _notificationService.streamValid(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: kPrimary),
-                  );
-                }
+      body: StreamBuilder<List<AppNotification>>(
+        stream: _notificationService.streamValid(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: kPrimary),
+            );
+          }
 
-                final all = snapshot.data ?? [];
-                final notifications = _tabIndex == 0
-                    ? all
-                    : all.where((n) => !n.isRead).toList();
+          final all = snapshot.data ?? [];
+          final notifications =
+              _tabIndex == 0 ? all : all.where((n) => !n.isRead).toList();
 
-                if (notifications.isEmpty) {
-                  return _emptyState();
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: notifications.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final n = notifications[index];
-                    return _notificationCard(n);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+          return Column(
+            children: [
+              _headerSummary(all),
+              Expanded(
+                child: notifications.isEmpty
+                    ? _emptyState()
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: notifications.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final n = notifications[index];
+                          return _notificationCard(n);
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

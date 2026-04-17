@@ -89,6 +89,26 @@ class _GoalsScreenState extends State<GoalsScreen> {
     }
   }
 
+  Future<void> _openEditGoal(GoalModel goal) async {
+    final updated = await Navigator.push<bool>(
+      context,
+      _buildAnimatedRoute<bool>(
+        CreateGoalScreen(goal: goal)
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (updated == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: kGreenBtn,
+          content: Text('Tu meta fue actualizada con éxito.'),
+        ),
+      );
+    }
+  }
+
   Future<void> _openGoalDetail(GoalModel goal) async {
     final result = await Navigator.push<String>(
       context,
@@ -646,6 +666,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
         return GoalCard(
           goal: goal,
           onTap: () => _openGoalDetail(goal),
+          onEdit: () => _openEditGoal(goal),
         );
       },
     );

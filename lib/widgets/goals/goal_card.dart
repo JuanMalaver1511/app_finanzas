@@ -19,10 +19,12 @@ class GoalCard extends StatelessWidget {
     super.key,
     required this.goal,
     this.onTap,
+    this.onEdit,
   });
 
   final GoalModel goal;
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
 
   String _formatCurrency(double value) {
     final intValue = value.round();
@@ -86,7 +88,6 @@ class GoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = goal.progress;
-    final percent = (progress * 100).round();
     final statusColor = _statusColor(goal.status);
 
     return TweenAnimationBuilder<double>(
@@ -127,6 +128,7 @@ class GoalCard extends StatelessWidget {
                 statusLabel: GoalCalculator.statusLabel(goal.status),
                 statusColor: statusColor,
                 statusIcon: _statusIcon(goal.status),
+                onEdit: onEdit,
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
@@ -288,6 +290,7 @@ class _GoalCardHeader extends StatelessWidget {
     required this.statusLabel,
     required this.statusColor,
     required this.statusIcon,
+    this.onEdit,
   });
 
   final String goalId;
@@ -296,6 +299,7 @@ class _GoalCardHeader extends StatelessWidget {
   final String statusLabel;
   final Color statusColor;
   final IconData statusIcon;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -347,33 +351,60 @@ class _GoalCardHeader extends StatelessWidget {
               children: [
                 Align(
                   alignment: Alignment.topRight,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: hasImage
-                          ? Colors.white.withOpacity(0.16)
-                          : Colors.white.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(99),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.18),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(statusIcon, color: statusColor, size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          statusLabel,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.2,
-                            fontWeight: FontWeight.w800,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onEdit != null)
+                        GestureDetector(
+                          onTap: onEdit,
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.12),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.edit_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: hasImage
+                              ? Colors.white.withOpacity(0.16)
+                              : Colors.white.withOpacity(0.14),
+                          borderRadius: BorderRadius.circular(99),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.18),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, color: statusColor, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              statusLabel,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12.2,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Spacer(),

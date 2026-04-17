@@ -51,12 +51,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   String? _expandedCategoryKey;
 
   void _handleBack() {
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-      return;
-    }
-
-    Navigator.pushReplacementNamed(context, '/dashboard');
+    Navigator.pushNamed(context, '/');
   }
 
   final List<String> _categoryPalette = const [
@@ -1589,6 +1584,119 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     });
   }
 
+  PreferredSizeWidget _buildAppBar() {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+
+    return AppBar(
+      backgroundColor: kBackground,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      automaticallyImplyLeading: false,
+      toolbarHeight: isMobile ? 74 : 78,
+      titleSpacing: 20,
+      title: Row(
+        children: [
+          InkWell(
+            onTap: _handleBack,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: kCard,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: kDark.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: kDark,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Container(
+            width: 6,
+            height: 24,
+            decoration: BoxDecoration(
+              color: kPrimary,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Presupuestos',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: kDark,
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: _headerIconButton(
+            icon: Icons.help_outline_rounded,
+            onTap: _showHelpDialog,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(right: 20),
+          child: GestureDetector(
+            onTap: _showCreateBudgetCategoryDialog,
+            child: Container(
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: kPrimary,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: kDark.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.add_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Crear categoría',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _topHeader() {
     final isMobile = MediaQuery.of(context).size.width < 700;
 
@@ -1922,6 +2030,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
 
     return Scaffold(
       backgroundColor: kBackground,
+      appBar: _buildAppBar(),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: kPrimary),
@@ -1930,15 +2039,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               color: kPrimary,
               onRefresh: _loadData,
               child: ListView(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  MediaQuery.of(context).padding.top + 10,
-                  20,
-                  20,
-                ),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
                 children: [
-                  _topHeader(),
-                  const SizedBox(height: 24),
                   _headerCard(
                     totalPlanned: totalPlanned,
                     totalSpent: totalSpent,
