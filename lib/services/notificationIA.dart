@@ -2,7 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tzdata;
 
-class NotificationService {
+class LocalNotificationService {
   final FlutterLocalNotificationsPlugin notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
@@ -12,7 +12,9 @@ class NotificationService {
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const settings = InitializationSettings(android: androidSettings);
+    const settings = InitializationSettings(
+      android: androidSettings,
+    );
 
     await notificationsPlugin.initialize(settings);
   }
@@ -25,10 +27,12 @@ class NotificationService {
     await notificationsPlugin.cancelAll();
 
     final bool positivo = balance >= 0;
-    final String titulo = positivo ? '¡Vas bien!' : 'Atención';
+
+    final String titulo = positivo ? 'Resumen Kybo' : 'Atención en Kybo';
+
     final String cuerpo = positivo
-        ? 'Tu balance este mes es positivo (\$${balance.toStringAsFixed(0)}). ¡Sigue así!'
-        : 'Tu balance este mes es negativo (\$${balance.toStringAsFixed(0)}). Revisa tus gastos.';
+        ? 'Tu balance del mes va positivo (\$${balance.toStringAsFixed(0)}). Sigue así.'
+        : 'Tu balance del mes va negativo (\$${balance.toStringAsFixed(0)}). Revisa tus gastos.';
 
     const androidDetails = AndroidNotificationDetails(
       'kybo_diario',
@@ -38,9 +42,12 @@ class NotificationService {
       priority: Priority.high,
     );
 
-    const details = NotificationDetails(android: androidDetails);
+    const details = NotificationDetails(
+      android: androidDetails,
+    );
 
     final now = tz.TZDateTime.now(tz.local);
+
     var scheduled = tz.TZDateTime(
       tz.local,
       now.year,
@@ -67,16 +74,27 @@ class NotificationService {
     );
   }
 
-  Future<void> mostrarNotificacion(String titulo, String cuerpo) async {
+  Future<void> mostrarNotificacion({
+    required String titulo,
+    required String cuerpo,
+  }) async {
     const androidDetails = AndroidNotificationDetails(
-      'finanzas_channel',
-      'Finanzas',
+      'kybo_general',
+      'Notificaciones Kybo',
+      channelDescription: 'Notificaciones locales de Kybo',
       importance: Importance.max,
       priority: Priority.high,
     );
 
-    const details = NotificationDetails(android: androidDetails);
+    const details = NotificationDetails(
+      android: androidDetails,
+    );
 
-    await notificationsPlugin.show(0, titulo, cuerpo, details);
+    await notificationsPlugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      titulo,
+      cuerpo,
+      details,
+    );
   }
 }

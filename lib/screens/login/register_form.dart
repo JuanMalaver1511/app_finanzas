@@ -19,6 +19,11 @@ class RegisterForm extends StatefulWidget {
 }
 
 class _RegisterFormState extends State<RegisterForm> {
+  static const Color _kyboPrimary = Color(0xFF2B2257);
+  static const Color _kyboAccent = Color(0xFFFFB84E);
+  static const Color _fieldBg = Color(0xFFF7F5FC);
+  static const Color _fieldBorder = Color(0xFFE5DEF3);
+
   final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
@@ -29,76 +34,98 @@ class _RegisterFormState extends State<RegisterForm> {
   bool isLoading = false;
   bool _obscurePassword = true;
 
-  /// ==============================
-  /// INPUT PRO
-  /// ==============================
-  Widget _input({
-    required TextEditingController controller,
+  bool _isValidEmail(String email) {
+    return email.contains("@") && email.contains(".");
+  }
+
+  InputDecoration _inputDecoration({
     required String hint,
     required IconData icon,
     bool isPassword = false,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: TextStyle(
+        color: Colors.grey.shade500,
+        fontSize: 15,
       ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword ? _obscurePassword : false,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(
-            color: Colors.black45,
-            fontSize: 14,
-          ),
-          prefixIcon: Icon(icon, color: Colors.black54),
-          suffixIcon: isPassword
-              ? IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                    color: Colors.black54,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _obscurePassword = !_obscurePassword;
-                    });
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(16),
-            borderSide: const BorderSide(
-              color: Color(0xFFFFB84E),
-              width: 1.5,
-            ),
-          ),
+      prefixIcon: Icon(
+        icon,
+        color: _kyboPrimary.withOpacity(.78),
+        size: 22,
+      ),
+      suffixIcon: isPassword
+          ? IconButton(
+              icon: Icon(
+                _obscurePassword
+                    ? Icons.visibility_off_rounded
+                    : Icons.visibility_rounded,
+                color: Colors.grey.shade500,
+                size: 22,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            )
+          : null,
+      filled: true,
+      fillColor: _fieldBg,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 18,
+        vertical: 22,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: _fieldBorder),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: _fieldBorder),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(
+          color: _kyboAccent,
+          width: 1.6,
         ),
       ),
     );
   }
 
-  /// ==============================
-  /// REGISTER
-  /// ==============================
+  Widget _input({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    bool isPassword = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.black.withOpacity(.72),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 9),
+        TextField(
+          controller: controller,
+          obscureText: isPassword ? _obscurePassword : false,
+          decoration: _inputDecoration(
+            hint: hint,
+            icon: icon,
+            isPassword: isPassword,
+          ),
+        ),
+      ],
+    );
+  }
+
   Future<void> _register() async {
     final name = nameController.text.trim();
     final email = emailController.text.trim();
@@ -108,6 +135,15 @@ class _RegisterFormState extends State<RegisterForm> {
       showCustomAlert(
         context,
         message: "Completa todos los campos",
+        type: AlertType.warning,
+      );
+      return;
+    }
+
+    if (!_isValidEmail(email)) {
+      showCustomAlert(
+        context,
+        message: "Correo inválido",
         type: AlertType.warning,
       );
       return;
@@ -159,7 +195,7 @@ class _RegisterFormState extends State<RegisterForm> {
         message: mensaje,
         type: AlertType.error,
       );
-    } catch (e) {
+    } catch (_) {
       showCustomAlert(
         context,
         message: "Error al guardar usuario",
@@ -170,9 +206,6 @@ class _RegisterFormState extends State<RegisterForm> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  /// ==============================
-  /// GOOGLE REGISTER
-  /// ==============================
   Future<void> _googleRegister() async {
     setState(() => isLoading = true);
 
@@ -182,8 +215,7 @@ class _RegisterFormState extends State<RegisterForm> {
       if (user == null) return;
 
       final email = user.email ?? "";
-
-      String name = user.displayName?.trim().isNotEmpty == true
+      final name = user.displayName?.trim().isNotEmpty == true
           ? user.displayName!
           : email.split('@')[0];
 
@@ -213,6 +245,7 @@ class _RegisterFormState extends State<RegisterForm> {
         ),
       );
     } catch (_) {
+      if (!mounted) return;
       showCustomAlert(
         context,
         message: "Error con Google",
@@ -223,143 +256,159 @@ class _RegisterFormState extends State<RegisterForm> {
     if (mounted) setState(() => isLoading = false);
   }
 
-  /// ==============================
-  /// UI
-  /// ==============================
+  Widget _socialButton({
+    required Widget child,
+    required VoidCallback? onTap,
+  }) {
+    return SizedBox(
+      width: 56,
+      height: 44,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          side: BorderSide(color: _kyboPrimary.withOpacity(.10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: Colors.white.withOpacity(.90),
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset("assets/images/logo.png", width: 55),
-              const SizedBox(height: 12),
-
-              const Text(
-                "Crear cuenta",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _input(
+          controller: nameController,
+          label: "Nombre",
+          hint: "Ingresa tu nombre",
+          icon: Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 16),
+        _input(
+          controller: emailController,
+          label: "Correo",
+          hint: "Ingresa tu correo",
+          icon: Icons.email_outlined,
+        ),
+        const SizedBox(height: 16),
+        _input(
+          controller: passwordController,
+          label: "Contraseña",
+          hint: "Crea una contraseña",
+          icon: Icons.lock_outline_rounded,
+          isPassword: true,
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          height: 58,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_kyboAccent, Color(0xFFFFC96F)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: _kyboAccent.withOpacity(.24),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              onPressed: isLoading ? null : _register,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: _kyboPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-
-              const SizedBox(height: 20),
-
-              _input(
-                controller: nameController,
-                hint: "Nombre",
-                icon: Icons.person_outline,
-              ),
-
-              const SizedBox(height: 12),
-
-              _input(
-                controller: emailController,
-                hint: "Correo electrónico",
-                icon: Icons.email_outlined,
-              ),
-
-              const SizedBox(height: 12),
-
-              _input(
-                controller: passwordController,
-                hint: "Contraseña",
-                icon: Icons.lock_outline,
-                isPassword: true,
-              ),
-
-              const SizedBox(height: 18),
-
-              /// 🔥 BOTÓN REGISTRARSE
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: isLoading ? null : _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFB84E),
-                    elevation: 1.5,
-                    shadowColor: Colors.black12,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: isLoading
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.black,
-                          ),
-                        )
-                      : const Text(
-                          "Registrarse",
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                ),
-              ),
-
-              const SizedBox(height: 14),
-              const Divider(),
-              const SizedBox(height: 14),
-
-              // ✅ "Registrarse con Google" en negro
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  icon: Image.asset("assets/images/google.png", width: 22),
-                  label: const Text(
-                    "Registrarse con Google",
-                    style: TextStyle(color: Colors.black),
-                  ),
-                  onPressed: isLoading ? null : _googleRegister,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ✅ "Iniciar sesión" en negro
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("¿Ya tienes cuenta?"),
-                  TextButton(
-                    onPressed: widget.onLogin,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.black,
-                    ),
-                    child: const Text(
-                      "Iniciar sesión",
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _kyboPrimary,
+                      ),
+                    )
+                  : const Text(
+                      "Crear cuenta",
                       style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
                       ),
                     ),
-                  )
-                ],
-              ),
-            ],
+            ),
           ),
         ),
-      ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              "¿Ya tienes cuenta?",
+              style: TextStyle(
+                color: Colors.black.withOpacity(.58),
+                fontSize: 13,
+              ),
+            ),
+            TextButton(
+              onPressed: widget.onLogin,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.only(left: 6),
+                foregroundColor: _kyboPrimary,
+              ),
+              child: const Text(
+                "Iniciar sesión",
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _socialButton(
+              onTap: isLoading ? null : _googleRegister,
+              child: Image.asset(
+                "assets/images/google.png",
+                width: 18,
+              ),
+            ),
+            const SizedBox(width: 12),
+            _socialButton(
+              onTap: null,
+              child: const Icon(
+                Icons.apple,
+                size: 18,
+                color: _kyboPrimary,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

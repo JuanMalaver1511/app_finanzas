@@ -23,6 +23,20 @@ class NotificationService {
       case 'month_without_budget':
         return const Duration(days: 30);
 
+      case 'debt_overdue':
+        return const Duration(days: 15);
+
+      case 'debt_upcoming':
+        return const Duration(days: 7);
+
+      case 'goal_at_risk':
+      case 'goal_delayed':
+        return const Duration(days: 15);
+
+      case 'income_expected':
+      case 'income_received':
+        return const Duration(days: 10);
+
       case 'admin_message':
       case 'system_update':
         return const Duration(days: 60);
@@ -161,5 +175,23 @@ class NotificationService {
       'createdAt': FieldValue.serverTimestamp(),
       'expiresAt': Timestamp.fromDate(expiresAt),
     });
+  }
+
+  Future<void> createFinanceAlert({
+    required String dedupeKey,
+    required String title,
+    required String message,
+    required String type,
+    String priority = 'medium',
+    String source = 'system',
+  }) async {
+    await createUnique(
+      dedupeKey: dedupeKey,
+      title: title,
+      message: message,
+      type: type,
+      priority: priority,
+      source: source,
+    );
   }
 }

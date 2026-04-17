@@ -177,7 +177,6 @@ class _DeudasScreenState extends State<DeudasScreen>
   String _filtroTipo = 'todos';
   String _ordenarPor = 'nombre';
   int? _expandedIndex;
-  bool _alertaMostrada = false;
 
   CollectionReference get _debtsRef => FirebaseFirestore.instance
       .collection('users')
@@ -236,62 +235,6 @@ class _DeudasScreenState extends State<DeudasScreen>
         lista.sort((a, b) => a.nombre.compareTo(b.nombre));
     }
     return lista;
-  }
-
-  // ─── MOSTRAR ALERTA DE DEUDAS VENCIDAS ─────────────────────────────────────
-  void _mostrarAlertaDeudas(List<Debt> allDebts) {
-    if (_alertaMostrada || allDebts.isEmpty) return;
-
-    _alertaMostrada = true;
-
-    final deudosVencidas = allDebts.where((d) => d.estaVencida).toList();
-    final proximoCuota = allDebts.isEmpty
-        ? null
-        : allDebts.reduce((a, b) => a.diaPago < b.diaPago ? a : b);
-
-    if (deudosVencidas.isNotEmpty) {
-      // 🔴 Hay deudas vencidas
-      final deuda = deudosVencidas.first;
-      final mensaje =
-          'Esta cuota está vencida\n${deuda.nombre} - ${fmt(deuda.cuotaMensual)}';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(mensaje,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white)),
-          backgroundColor: kRed,
-          duration: const Duration(seconds: 10),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-    } else if (proximoCuota != null) {
-      // 🟡 Sin vencidas, pero hay próxima cuota
-      final diasFalta = proximoCuota.diaPago - DateTime.now().day;
-      final mensaje =
-          'Próxima cuota: ${proximoCuota.nombre}\nDía ${proximoCuota.diaPago}: ${fmt(proximoCuota.cuotaMensual)}';
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(mensaje,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white)),
-          backgroundColor: kAmber,
-          duration: const Duration(seconds: 10),
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -481,22 +424,96 @@ class _DeudasScreenState extends State<DeudasScreen>
         final all = snap.data!.docs.map((e) => Debt.fromDoc(e)).toList();
         final debts = _filtrarOrdenar(all);
 
-        // 🔔 Mostrar alerta una sola vez
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _mostrarAlertaDeudas(all);
-        });
+        Widget _buildDebtStatusBanner(List<Debt> allDebts) {
+          if (allDebts.isEmpty) return const SizedBox.shrink();
+
+          final vencidas = allDebts.where((d) => d.estaVencida).toList();
+
+          if (vencidas.isNotEmpty) {
+            return Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: kRedLight,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kRed.withOpacity(0.18)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: kRedDark),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      vencidas.length == 1
+                          ? 'Tienes 1 deuda vencida. Revisa ${vencidas.first.nombre} para ponerte al día.'
+                          : 'Tienes ${vencidas.length} deudas vencidas. Revisa primero las cuotas atrasadas.',
+                      style: const TextStyle(
+                        color: kRedDark,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final hoy = DateTime.now().day;
+          final futuras = allDebts.where((d) => d.diaPago >= hoy).toList()
+            ..sort((a, b) => a.diaPago.compareTo(b.diaPago));
+
+          if (futuras.isNotEmpty) {
+            final next = futuras.first;
+            return Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: kAmberLight,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kAmber.withOpacity(0.22)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.calendar_today_rounded,
+                      color: kAmberDark, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Próximo pago: ${next.nombre} · día ${next.diaPago} · ${fmt(next.cuotaMensual)}',
+                      style: const TextStyle(
+                        color: kAmberDark,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return const SizedBox.shrink();
+        }
 
         return ListView(
           padding: EdgeInsets.zero,
           children: [
             _buildResumenCards(all, isWide),
+            _buildDebtStatusBanner(all),
             _buildFiltros(isWide),
             if (debts.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(40),
                 child: Center(
-                  child: Text('No hay deudas en esta categoría',
-                      style: TextStyle(color: kGrey)),
+                  child: Text(
+                    'No hay deudas en esta categoría',
+                    style: TextStyle(color: kGrey),
+                  ),
                 ),
               )
             else

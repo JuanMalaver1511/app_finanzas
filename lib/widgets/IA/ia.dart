@@ -7,14 +7,13 @@ import '../../services/transaction_service.dart';
 import '../../services/DeepSeek_IA.dart';
 import '../../services/notificationIA.dart';
 
-// ─── COLORES (misma paleta del proyecto) ─────────────────────────────────────
-const _kDark = Color.fromARGB(255, 8, 188, 38);
-const kBlack = Color(0xFF000000);
+// ─── COLORES KYBO ────────────────────────────────────────────────────────────
+const _kDark = Color(0xFF1A1A2E);
 const _kBg = Color(0xFFF5F6FA);
 const _kCard = Colors.white;
 const _kGrey = Color(0xFF9098A9);
 const _kGreyLight = Color(0xFFEEF0F5);
-const _kAmber = Color(0xFFE6A817);
+const _kAmber = Color(0xFFFFBB4E);
 const _kAmberLight = Color(0xFFFFF3D6);
 const _kAmberDark = Color(0xFF9A6D00);
 const _kGreen = Color(0xFF16A163);
@@ -23,6 +22,7 @@ const _kGreenDark = Color(0xFF0A6B40);
 const _kRed = Color(0xFFD63031);
 const _kRedLight = Color(0xFFFFF0F0);
 const _kRedDark = Color(0xFF8B1A1A);
+const _kPurple = Color(0xFF6366F1);
 
 class IAInsightButton extends StatefulWidget {
   const IAInsightButton({super.key});
@@ -33,7 +33,7 @@ class IAInsightButton extends StatefulWidget {
 
 class _IAInsightButtonState extends State<IAInsightButton> {
   final ai = DeepSeekService();
-  final noti = NotificationService();
+  final noti = LocalNotificationService();
 
   bool loading = false;
 
@@ -59,7 +59,7 @@ class _IAInsightButtonState extends State<IAInsightButton> {
       'Septiembre',
       'Octubre',
       'Noviembre',
-      'Diciembre'
+      'Diciembre',
     ];
     return meses[mes - 1];
   }
@@ -95,6 +95,7 @@ class _IAInsightButtonState extends State<IAInsightButton> {
             : cuota is double
                 ? cuota
                 : 0.0;
+
         final saldoVal = saldoActual is int
             ? saldoActual.toDouble()
             : saldoActual is double
@@ -114,7 +115,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
 
       if (!mounted) return;
 
-      // Programar notificación diaria en Android con datos frescos
       if (!kIsWeb) {
         await noti.programarNotificacionDiaria(
           balance: balance,
@@ -123,7 +123,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
         );
       }
 
-      // Siempre mostrar el modal bonito (web y Android)
       _showInsightDialog(
         mes: mes,
         ingresos: ingresos,
@@ -136,16 +135,24 @@ class _IAInsightButtonState extends State<IAInsightButton> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            backgroundColor: kBlack,
+            backgroundColor: _kDark,
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
             content: const Row(
               children: [
                 Icon(Icons.error_outline_rounded, color: _kRed, size: 18),
                 SizedBox(width: 10),
-                Text('Error al analizar datos financieros',
-                    style: TextStyle(color: Colors.white, fontSize: 13)),
+                Expanded(
+                  child: Text(
+                    'No se pudo generar el análisis financiero.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -166,11 +173,13 @@ class _IAInsightButtonState extends State<IAInsightButton> {
   }) {
     final isMobile = MediaQuery.of(context).size.width < 600;
     final isPositive = balance >= 0;
+
     final balanceColor = isPositive ? _kGreenDark : _kRedDark;
     final balanceBg = isPositive ? _kGreenLight : _kRedLight;
     final balanceLabel = isPositive ? 'Superávit' : 'Déficit';
     final balanceIcon =
         isPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded;
+
     const debtColor = _kRedDark;
     const debtBg = _kRedLight;
     const debtIcon = Icons.credit_card_rounded;
@@ -186,38 +195,47 @@ class _IAInsightButtonState extends State<IAInsightButton> {
             vertical: 24,
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: const BoxConstraints(maxWidth: 560),
             child: Container(
               decoration: BoxDecoration(
                 color: _kCard,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.14),
+                    blurRadius: 26,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ── Header ────────────────────────────────────────────────
                   Container(
                     padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF1A1A2E), Color(0xFF2D2B55)],
+                        colors: [_kDark, Color(0xFF2D2B55)],
                       ),
                       borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(24)),
+                          BorderRadius.vertical(top: Radius.circular(26)),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 44,
-                          height: 44,
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(Icons.auto_awesome_rounded,
-                              color: Colors.white, size: 22),
+                          child: const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Colors.white,
+                            size: 23,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -225,18 +243,20 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text(
-                                'Análisis financiero',
+                                'Análisis financiero IA',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Text(
-                                _nombreMes(mes),
+                                'Resumen de ${_nombreMes(mes)}',
                                 style: const TextStyle(
-                                    color: Colors.white60, fontSize: 12),
+                                  color: Colors.white70,
+                                  fontSize: 12.5,
+                                ),
                               ),
                             ],
                           ),
@@ -244,21 +264,23 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                         GestureDetector(
                           onTap: () => Navigator.pop(dialogCtx),
                           child: Container(
-                            width: 32,
-                            height: 32,
+                            width: 34,
+                            height: 34,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withOpacity(0.10),
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const Icon(Icons.close_rounded,
-                                size: 16, color: Colors.white70),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: Colors.white70,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  // ── Métricas ─────────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                     child: isMobile
@@ -334,7 +356,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                           ),
                   ),
 
-                  // ── Respuesta IA ─────────────────────────────────────────
                   Flexible(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
@@ -353,11 +374,11 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                               ),
                               const SizedBox(width: 8),
                               const Text(
-                                'Recomendación',
+                                'Recomendación de Kybo',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: kBlack,
+                                  fontWeight: FontWeight.w800,
+                                  color: _kDark,
                                 ),
                               ),
                             ],
@@ -368,15 +389,16 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: _kBg,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                  color: Colors.black.withOpacity(0.07)),
+                                color: Colors.black.withOpacity(0.06),
+                              ),
                             ),
                             child: Text(
                               respuesta,
                               style: const TextStyle(
                                 fontSize: 13,
-                                color: kBlack,
+                                color: _kDark,
                                 height: 1.65,
                               ),
                             ),
@@ -386,28 +408,35 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                     ),
                   ),
 
-                  // ── Footer ───────────────────────────────────────────────
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: _kAmberLight,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.info_outline_rounded,
-                                  size: 12, color: _kAmberDark),
+                              Icon(
+                                Icons.info_outline_rounded,
+                                size: 12,
+                                color: _kAmberDark,
+                              ),
                               SizedBox(width: 5),
-                              Text('Generado por IA',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: _kAmberDark,
-                                      fontWeight: FontWeight.w500)),
+                              Text(
+                                'Generado por IA',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _kAmberDark,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -416,17 +445,20 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                           onTap: () => Navigator.pop(dialogCtx),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 11),
+                              horizontal: 20,
+                              vertical: 11,
+                            ),
                             decoration: BoxDecoration(
-                              color: _kRed,
-                              borderRadius: BorderRadius.circular(12),
+                              color: _kPurple,
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             child: const Text(
                               'Cerrar',
                               style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600),
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -463,18 +495,27 @@ class _IAInsightButtonState extends State<IAInsightButton> {
               children: [
                 Icon(icon, size: 13, color: color),
                 const SizedBox(width: 4),
-                Text(label,
+                Expanded(
+                  child: Text(
+                    label,
                     style: TextStyle(
-                        fontSize: 10,
-                        color: color,
-                        fontWeight: FontWeight.w600)),
+                      fontSize: 10,
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 5),
             Text(
               value,
               style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w800, color: color),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -509,14 +550,23 @@ class _IAInsightButtonState extends State<IAInsightButton> {
             child: Icon(icon, size: 17, color: color),
           ),
           const SizedBox(width: 12),
-          Text(label,
+          Expanded(
+            child: Text(
+              label,
               style: TextStyle(
-                  fontSize: 13, color: color, fontWeight: FontWeight.w600)),
-          const Spacer(),
+                fontSize: 13,
+                color: color,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w800, color: color),
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -528,11 +578,19 @@ class _IAInsightButtonState extends State<IAInsightButton> {
     return GestureDetector(
       onTap: loading ? null : _analizar,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
         decoration: BoxDecoration(
-          color: loading ? const Color(0xFF3A3A55) : _kDark,
-          borderRadius: BorderRadius.circular(14),
+          color: loading ? const Color(0xFF32324A) : _kPurple,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: _kPurple.withOpacity(0.22),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -543,19 +601,22 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                 height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white60,
+                  color: Colors.white70,
                 ),
               )
             else
-              const Icon(Icons.auto_awesome_rounded,
-                  size: 17, color: Colors.white),
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 17,
+                color: Colors.white,
+              ),
             const SizedBox(width: 9),
             Text(
               loading ? 'Analizando...' : 'Análisis con IA',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
               ),
             ),
