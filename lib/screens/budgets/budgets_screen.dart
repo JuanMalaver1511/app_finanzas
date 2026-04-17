@@ -51,6 +51,13 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   String? _expandedCategoryKey;
 
   void _handleBack() {
+    final navigator = Navigator.of(context);
+
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
     Navigator.pushNamed(context, '/');
   }
 
@@ -468,7 +475,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         _controllers.putIfAbsent(key, () => TextEditingController());
 
         if (planned != null && planned > 0) {
-          _controllers[key]!.text = planned.toStringAsFixed(0);
+          _controllers[key]!.text =
+              NumberFormat('#,###', 'es_CO').format(planned);
         } else {
           _controllers[key]!.text = '';
         }
@@ -1593,8 +1601,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       elevation: 0,
       scrolledUnderElevation: 0,
       automaticallyImplyLeading: false,
-      toolbarHeight: isMobile ? 74 : 78,
-      titleSpacing: 20,
+      toolbarHeight: isMobile ? 72 : 78,
+      titleSpacing: isMobile ? 14 : 20,
       title: Row(
         children: [
           InkWell(
@@ -1621,17 +1629,17 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Container(
-            width: 6,
-            height: 24,
+            width: 5,
+            height: 22,
             decoration: BoxDecoration(
               color: kPrimary,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'Presupuestos',
               maxLines: 1,
@@ -1639,7 +1647,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               style: TextStyle(
                 color: kDark,
                 fontWeight: FontWeight.w800,
-                fontSize: 22,
+                fontSize: isMobile ? 17 : 22,
               ),
             ),
           ),
@@ -1653,201 +1661,47 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             onTap: _showHelpDialog,
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(right: 20),
-          child: GestureDetector(
-            onTap: _showCreateBudgetCategoryDialog,
-            child: Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: kPrimary,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: kDark.withOpacity(0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.add_rounded,
-                    size: 18,
-                    color: Colors.white,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Crear categoría',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _topHeader() {
-    final isMobile = MediaQuery.of(context).size.width < 700;
-
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              GestureDetector(
-                onTap: _handleBack,
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: kCard,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kDark.withOpacity(0.06),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: kDark,
-                    size: 18,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 6,
-                height: 22,
+        if (!isMobile)
+          Padding(
+            padding: const EdgeInsets.only(right: 20),
+            child: GestureDetector(
+              onTap: _showCreateBudgetCategoryDialog,
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
                   color: kPrimary,
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kDark.withOpacity(0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Presupuestos',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: kDark,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 24,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              _headerIconButton(
-                icon: Icons.help_outline_rounded,
-                onTap: _showHelpDialog,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _showCreateBudgetCategoryDialog,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Crear categoría'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: kDark,
-                elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Crear categoría',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        GestureDetector(
-          onTap: _handleBack,
-          child: Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: kCard,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: kDark.withOpacity(0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: kDark,
-              size: 18,
-            ),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Container(
-          width: 7,
-          height: 24,
-          decoration: BoxDecoration(
-            color: kPrimary,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Text(
-            'Presupuestos',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: kDark,
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        _headerIconButton(
-          icon: Icons.help_outline_rounded,
-          onTap: _showHelpDialog,
-        ),
-        const SizedBox(width: 8),
-        ElevatedButton.icon(
-          onPressed: _showCreateBudgetCategoryDialog,
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text('Crear categoría'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimary,
-            foregroundColor: kDark,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          ),
-        ),
       ],
     );
   }
@@ -1856,8 +1710,9 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         width: 42,
         height: 42,
@@ -1918,7 +1773,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                         color: kPrimary,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
                         'Cómo usar tus presupuestos',
@@ -2031,6 +1886,15 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     return Scaffold(
       backgroundColor: kBackground,
       appBar: _buildAppBar(),
+      floatingActionButton: MediaQuery.of(context).size.width < 700
+          ? FloatingActionButton(
+              onPressed: _showCreateBudgetCategoryDialog,
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              elevation: 2,
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: kPrimary),
@@ -2039,7 +1903,12 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
               color: kPrimary,
               onRefresh: _loadData,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  16,
+                  20,
+                  MediaQuery.of(context).size.width < 700 ? 96 : 20,
+                ),
                 children: [
                   _headerCard(
                     totalPlanned: totalPlanned,
@@ -2232,6 +2101,25 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _formatBudgetInput(TextEditingController controller, String value) {
+    final clean = value.replaceAll('.', '').replaceAll(',', '').trim();
+
+    if (clean.isEmpty) {
+      controller.value = const TextEditingValue(text: '');
+      return;
+    }
+
+    final number = int.tryParse(clean);
+    if (number == null) return;
+
+    final formatted = NumberFormat('#,###', 'es_CO').format(number);
+
+    controller.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 
@@ -3017,13 +2905,17 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
                                   FilteringTextInputFormatter.allow(
-                                    RegExp(r'[0-9]'),
-                                  ),
+                                      RegExp(r'[0-9.]')),
                                 ],
+                                onChanged: (value) {
+                                  final controller = _controllers[categoryKey];
+                                  if (controller == null) return;
+                                  _formatBudgetInput(controller, value);
+                                },
                                 decoration: InputDecoration(
                                   filled: true,
                                   fillColor: Colors.white,
-                                  hintText: 'Ej: 300000',
+                                  hintText: 'Ej: 300.000',
                                   labelText: 'Presupuesto mensual',
                                   prefixIcon:
                                       const Icon(Icons.attach_money_rounded),

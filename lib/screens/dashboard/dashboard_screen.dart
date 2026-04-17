@@ -910,7 +910,7 @@ class _BalanceCards extends StatelessWidget {
         children: [
           _StatCard(
             label: 'Balance total',
-            value: 'COP ${balance.toStringAsFixed(2)}',
+            value: _formatMoney(balance),
             icon: Icons.account_balance_wallet_outlined,
             iconColor: kAmber,
             valueColor: kDark,
@@ -922,7 +922,7 @@ class _BalanceCards extends StatelessWidget {
               Expanded(
                 child: _StatCard(
                   label: 'Ingresos',
-                  value: 'COP ${income.toStringAsFixed(2)}',
+                  value: _formatMoney(balance),
                   icon: Icons.trending_up_rounded,
                   iconColor: kGreen,
                   valueColor: kGreen,
@@ -932,7 +932,7 @@ class _BalanceCards extends StatelessWidget {
               Expanded(
                 child: _StatCard(
                   label: 'Gastos',
-                  value: 'COP ${expense.toStringAsFixed(2)}',
+                  value: _formatMoney(balance),
                   icon: Icons.trending_down_rounded,
                   iconColor: kRed,
                   valueColor: kRed,
