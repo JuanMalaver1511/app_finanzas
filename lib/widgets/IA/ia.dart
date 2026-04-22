@@ -116,7 +116,7 @@ class _IAInsightButtonState extends State<IAInsightButton> {
       if (!mounted) return;
 
       if (!kIsWeb) {
-        await noti.programarNotificacionDiaria(
+        await noti.programarNotificacionesDiarias(
           balance: balance,
           ingresos: ingresos,
           gastos: gastos,
@@ -280,7 +280,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                       ],
                     ),
                   ),
-
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
                     child: isMobile
@@ -355,7 +354,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                             ],
                           ),
                   ),
-
                   Flexible(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
@@ -407,7 +405,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
                       ),
                     ),
                   ),
-
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                     child: Row(

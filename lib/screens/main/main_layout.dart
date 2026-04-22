@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 import '../dashboard/dashboard_screen.dart';
 import '../movements/movements_screen.dart';
@@ -7,6 +8,7 @@ import '../goals/goals_screen.dart';
 import '../profile/profile_screen.dart';
 import '../../widgets/common/app_sidebar.dart';
 import '../budgets/budgets_screen.dart';
+import '../../services/notificationIA.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -17,6 +19,20 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleNotifications();
+  }
+
+  Future<void> _scheduleNotifications() async {
+    if (!kIsWeb) {
+      final noti = LocalNotificationService();
+      await noti.init();
+      await noti.programarNotificacionesDiariasGenericas();
+    }
+  }
 
   void _onChange(int i) {
     setState(() => _index = i);
@@ -130,9 +146,8 @@ class _MainLayoutState extends State<MainLayout> {
           margin: const EdgeInsets.symmetric(horizontal: 4),
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
           decoration: BoxDecoration(
-            color: isActive
-                ? activeColor.withOpacity(0.10)
-                : Colors.transparent,
+            color:
+                isActive ? activeColor.withOpacity(0.10) : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
