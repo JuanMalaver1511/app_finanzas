@@ -49,6 +49,23 @@ class LocalNotificationService {
   final FlutterLocalNotificationsPlugin notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  Map<String, String> _buildFinanceSummaryContent({
+    required double balance,
+    required double ingresos,
+    required double gastos,
+  }) {
+    final bool positivo = balance >= 0;
+    final String titulo = positivo ? 'Resumen Kybo' : 'Atencion en Kybo';
+    final String cuerpo = positivo
+        ? 'Balance: \$${balance.toStringAsFixed(0)}. Ingresos: \$${ingresos.toStringAsFixed(0)}. Gastos: \$${gastos.toStringAsFixed(0)}.'
+        : 'Balance: \$${balance.toStringAsFixed(0)}. Ingresos: \$${ingresos.toStringAsFixed(0)}. Gastos: \$${gastos.toStringAsFixed(0)}. Revisa tus gastos.';
+
+    return {
+      'titulo': titulo,
+      'cuerpo': cuerpo,
+    };
+  }
+
   Future<void> init() async {
     tzdata.initializeTimeZones();
 
@@ -155,6 +172,23 @@ class LocalNotificationService {
       matchDateTimeComponents: DateTimeComponents.time,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  Future<void> enviarResumenFinancieroAhora({
+    required double balance,
+    required double ingresos,
+    required double gastos,
+  }) async {
+    final content = _buildFinanceSummaryContent(
+      balance: balance,
+      ingresos: ingresos,
+      gastos: gastos,
+    );
+
+    await mostrarNotificacion(
+      titulo: content['titulo']!,
+      cuerpo: content['cuerpo']!,
     );
   }
 
