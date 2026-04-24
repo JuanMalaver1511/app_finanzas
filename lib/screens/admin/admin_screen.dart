@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/notificationIA.dart';
+import '../../services/transaction_service.dart';
 import '../../widgets/admin/sidebar_icon.dart';
 import '../auth/auth_wrapper.dart';
 
@@ -31,15 +34,25 @@ class _AdminScreenState extends State<AdminScreen> {
   int neverLoggedUsers = 0;
 
   bool isLoading = true;
+  bool isSendingNotification = false;
 
   double activePercent = 0;
   double inactivePercent = 0;
   double blockedPercent = 0;
 
+  final LocalNotificationService _localNotificationService =
+      LocalNotificationService();
+
   @override
   void initState() {
     super.initState();
+    _initNotifications();
     _loadUserStats();
+  }
+
+  Future<void> _initNotifications() async {
+    if (kIsWeb) return;
+    await _localNotificationService.init();
   }
 
   Future<void> _loadUserStats() async {
@@ -151,6 +164,57 @@ class _AdminScreenState extends State<AdminScreen> {
         MaterialPageRoute(builder: (_) => const AuthWrapper()),
         (route) => false,
       );
+    }
+  }
+
+  Future<void> _sendManualFinanceNotification() async {
+    if (isSendingNotification) return;
+
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Las notificaciones nativas manuales solo funcionan en la app movil.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() => isSendingNotification = true);
+
+    try {
+      final resumen = await TransactionService(user.uid).getResumenMensual();
+      final ingresos = (resumen['ingresos'] ?? 0).toDouble();
+      final gastos = (resumen['gastos'] ?? 0).toDouble();
+      final balance = (resumen['balance'] ?? 0).toDouble();
+
+      await _localNotificationService.enviarResumenFinancieroAhora(
+        balance: balance,
+        ingresos: ingresos,
+        gastos: gastos,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Notificacion enviada al dispositivo actual.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo enviar la notificacion manual.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isSendingNotification = false);
+      }
     }
   }
 
@@ -418,26 +482,78 @@ class _AdminScreenState extends State<AdminScreen> {
                         "${blockedPercent.toStringAsFixed(1)}%", _danger),
                   ],
                 ),
+                const SizedBox(height: 14),
+                _buildManualNotificationButton(isFullWidth: true),
               ],
             )
           : Row(
               children: [
                 Expanded(flex: 4, child: _heroTexts()),
                 const SizedBox(width: 18),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    _heroChip("Activos", "${activePercent.toStringAsFixed(1)}%",
-                        _success),
-                    _heroChip("Inactivos",
-                        "${inactivePercent.toStringAsFixed(1)}%", _warning),
-                    _heroChip("Bloqueados",
-                        "${blockedPercent.toStringAsFixed(1)}%", _danger),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _heroChip(
+                          "Activos",
+                          "${activePercent.toStringAsFixed(1)}%",
+                          _success,
+                        ),
+                        _heroChip(
+                          "Inactivos",
+                          "${inactivePercent.toStringAsFixed(1)}%",
+                          _warning,
+                        ),
+                        _heroChip(
+                          "Bloqueados",
+                          "${blockedPercent.toStringAsFixed(1)}%",
+                          _danger,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildManualNotificationButton(),
                   ],
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildManualNotificationButton({bool isFullWidth = false}) {
+    return SizedBox(
+      width: isFullWidth ? double.infinity : null,
+      child: ElevatedButton.icon(
+        onPressed:
+            isSendingNotification ? null : _sendManualFinanceNotification,
+        icon: isSendingNotification
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: _kyboPrimary,
+                ),
+              )
+            : const Icon(Icons.send_rounded),
+        label: Text(
+          isSendingNotification
+              ? 'Enviando...'
+              : 'Enviar notificaciones',
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _kyboAccent,
+          foregroundColor: _kyboPrimary,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
     );
   }
 
