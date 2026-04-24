@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../services/transaction_service.dart';
 import '../../services/DeepSeek_IA.dart';
-import '../../services/notificationIA.dart';
 
 // ─── COLORES KYBO ────────────────────────────────────────────────────────────
 const _kDark = Color(0xFF1A1A2E);
 const _kBg = Color(0xFFF5F6FA);
 const _kCard = Colors.white;
-const _kGrey = Color(0xFF9098A9);
-const _kGreyLight = Color(0xFFEEF0F5);
 const _kAmber = Color(0xFFFFBB4E);
 const _kAmberLight = Color(0xFFFFF3D6);
 const _kAmberDark = Color(0xFF9A6D00);
-const _kGreen = Color(0xFF16A163);
 const _kGreenLight = Color(0xFFE8F8F0);
 const _kGreenDark = Color(0xFF0A6B40);
 const _kRed = Color(0xFFD63031);
@@ -33,15 +28,8 @@ class IAInsightButton extends StatefulWidget {
 
 class _IAInsightButtonState extends State<IAInsightButton> {
   final ai = DeepSeekService();
-  final noti = LocalNotificationService();
 
   bool loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    noti.init();
-  }
 
   String _formatMoney(double value) =>
       '\$${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
@@ -114,14 +102,6 @@ class _IAInsightButtonState extends State<IAInsightButton> {
       );
 
       if (!mounted) return;
-
-      if (!kIsWeb) {
-        await noti.programarNotificacionesDiarias(
-          balance: balance,
-          ingresos: ingresos,
-          gastos: gastos,
-        );
-      }
 
       _showInsightDialog(
         mes: mes,

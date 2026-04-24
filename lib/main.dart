@@ -10,6 +10,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
+import 'services/push_notification_service.dart';
 
 import 'screens/auth/auth_wrapper.dart';
 
@@ -33,6 +34,7 @@ Future<void> main() async {
     );
 
     FirebaseFunctions.instanceFor(region: 'us-central1');
+    await PushNotificationService.instance.initialize();
 
     if (kIsWeb) {
       FirebaseFirestore.instance.settings = const Settings(
