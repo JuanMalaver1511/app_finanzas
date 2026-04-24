@@ -1,4 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -87,6 +89,17 @@ class AuthService {
   /// LOGOUT
   /// ==============================
   Future<void> logout() async {
+    final user = _auth.currentUser;
+
+    if (!kIsWeb && user != null) {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'notificationTokens': FieldValue.arrayRemove([token]),
+        }, SetOptions(merge: true));
+      }
+    }
+
     await _auth.signOut();
 
     if (!kIsWeb) {

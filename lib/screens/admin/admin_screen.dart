@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../services/notificationIA.dart';
-import '../../services/transaction_service.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../../widgets/admin/sidebar_icon.dart';
 import '../auth/auth_wrapper.dart';
 
@@ -40,19 +38,10 @@ class _AdminScreenState extends State<AdminScreen> {
   double inactivePercent = 0;
   double blockedPercent = 0;
 
-  final LocalNotificationService _localNotificationService =
-      LocalNotificationService();
-
   @override
   void initState() {
     super.initState();
-    _initNotifications();
     _loadUserStats();
-  }
-
-  Future<void> _initNotifications() async {
-    if (kIsWeb) return;
-    await _localNotificationService.init();
   }
 
   Future<void> _loadUserStats() async {
@@ -170,45 +159,47 @@ class _AdminScreenState extends State<AdminScreen> {
   Future<void> _sendManualFinanceNotification() async {
     if (isSendingNotification) return;
 
-    if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Las notificaciones nativas manuales solo funcionan en la app movil.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
     setState(() => isSendingNotification = true);
 
     try {
-      final resumen = await TransactionService(user.uid).getResumenMensual();
-      final ingresos = (resumen['ingresos'] ?? 0).toDouble();
-      final gastos = (resumen['gastos'] ?? 0).toDouble();
-      final balance = (resumen['balance'] ?? 0).toDouble();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw FirebaseFunctionsException(
+          code: 'unauthenticated',
+          message: 'No hay una sesion activa en Firebase Auth.',
+        );
+      }
 
-      await _localNotificationService.enviarResumenFinancieroAhora(
-        balance: balance,
-        ingresos: ingresos,
-        gastos: gastos,
-      );
+      await user.getIdToken(true);
+
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('sendFinanceNotificationsToAllUsers');
+      final result = await callable.call();
+      final data = Map<String, dynamic>.from(result.data as Map);
+      final enviados = data['sentCount'] ?? 0;
+      final procesados = data['processedUsers'] ?? 0;
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Notificacion enviada al dispositivo actual.'),
+        SnackBar(
+          content: Text(
+            'Notificaciones enviadas: $enviados de $procesados usuarios procesados.',
+          ),
         ),
       );
-    } catch (_) {
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      final message = e.message ?? e.code;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo enviar la notificacion masiva: $message'),
+        ),
+      );
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo enviar la notificacion manual.'),
+        SnackBar(
+          content: Text('No se pudo enviar la notificacion masiva: $e'),
         ),
       );
     } finally {
