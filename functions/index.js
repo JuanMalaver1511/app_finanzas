@@ -5,6 +5,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const functionsV1 = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+const { buildKyboEmailTemplate } = require("./emailTemplates");
 
 admin.initializeApp();
 
@@ -97,14 +98,15 @@ exports.createUserByAdmin = onCall(async (request) => {
       from: `"KYBO App" <${emailUser}>`,
       to: email,
       subject: "Activa tu cuenta en KYBO",
-      html: `
-        <div style="font-family: Arial;">
-          <h2 style="color:#FFB84E;">Bienvenido a KYBO 💸</h2>
-          <p>Hola <b>${name}</b>,</p>
-          <p>Haz clic para crear tu contraseña:</p>
-          <a href="${link}">Crear contraseña</a>
-        </div>
-      `,
+      html: buildKyboEmailTemplate({
+        preheader: "Activa tu cuenta en KYBO",
+        title: "Bienvenido a KYBO",
+        message: `Tu cuenta fue creada correctamente. Haz clic en el botón para crear tu contraseña y empezar a usar la app.`,
+        buttonText: "Crear mi contraseña",
+        buttonUrl: link,
+        userName: name,
+        badge: "Cuenta creada",
+      }),
     });
 
     console.log("📧 Correo enviado:", info.response);
@@ -508,24 +510,25 @@ async function sendDebtReminderEmailsManual() {
       )
       .join("");
 
-    const html = `
-      <div style="font-family: Arial, sans-serif; color: #333;">
-        <h2 style="color:#FFB84E;">Recordatorio de pago</h2>
-        <p>Hola ${name},</p>
-        <p>Tus próximas cuotas vencen mañana. Ponte al día para evitar retrasos e intereses.</p>
-        <p><strong>Vencimiento:</strong> mañana, día ${dueDay}</p>
-        <ul>${debtRows}</ul>
-        <p style="margin-top: 12px;">Con cada pago mantendrás tu saldo bajo control y te liberarás de deudas más rápido.</p>
-        <p>Revisa tu app para registrar tu pago.</p>
-      </div>
-    `;
-
     try {
       const info = await transporter.sendMail({
         from: `"KYBO App" <${emailUser}>`,
         to: email,
         subject,
-        html,
+        html: buildKyboEmailTemplate({
+          preheader: "Recordatorio de pago",
+          title: subject,
+          message: `
+            <p>Tus próximas cuotas vencen mañana. Ponte al día para evitar retrasos e intereses.</p>
+            <p><strong>Vencimiento:</strong> mañana, día ${dueDay}</p>
+            <ul style="padding-left:18px;margin:0;">${debtRows}</ul>
+            <p style="margin-top:16px;">Revisa tu app para registrar tu pago.</p>
+          `,
+          buttonText: "Revisar mis deudas",
+          buttonUrl: "#",
+          userName: name,
+          badge: "Recordatorio financiero",
+        }),
       });
 
       console.log(`📧 Correo recordatorio enviado a ${email}:`, info.response);
@@ -596,6 +599,9 @@ exports.sendCustomNotification = onCall(
         sendApp,
         sendEmail,
         priority,
+        status: "sent",
+        scheduledAt: null,
+        sentAt: admin.firestore.FieldValue.serverTimestamp(),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         totalRecipients: 0,
         appSent: 0,
@@ -643,12 +649,15 @@ exports.sendCustomNotification = onCall(
             from: `"KYBO App" <${emailUser}>`,
             to: userData.email,
             subject: title,
-            html: `
-              <div style="font-family: Arial, sans-serif;">
-                <h2 style="color:#FFB84E;">${title}</h2>
-                <p>${message}</p>
-              </div>
-            `,
+            html: buildKyboEmailTemplate({
+              preheader: title,
+              title,
+              message,
+              buttonText: "Abrir KYBO",
+              buttonUrl: "#",
+              userName: userData.name || "",
+              badge: "Nueva notificación",
+            }),
           });
 
           emailSent++;
@@ -674,8 +683,155 @@ exports.sendCustomNotification = onCall(
 );
 
 /// ==============================
-/// MARCAR NOTIFICACIÓN COMO LEÍDA
+/// PROCESAR CAMPAÑAS PROGRAMADAS
 /// ==============================
+exports.processScheduledNotifications = onSchedule(
+  {
+    schedule: "every 5 minutes",
+    timeZone: "America/Bogota",
+    region: "us-central1",
+  },
+  async () => {
+    const now = admin.firestore.Timestamp.now();
+
+    const scheduledSnapshot = await admin
+      .firestore()
+      .collection("notification_campaigns")
+      .where("status", "==", "scheduled")
+      .where("scheduledAt", "<=", now)
+      .limit(10)
+      .get();
+
+    if (scheduledSnapshot.empty) {
+      console.log("No hay campañas programadas pendientes.");
+      return;
+    }
+
+    for (const campaignDoc of scheduledSnapshot.docs) {
+      const campaignRef = campaignDoc.ref;
+      const campaign = campaignDoc.data();
+      const campaignId = campaignDoc.id;
+
+      try {
+        await campaignRef.update({
+          status: "sending",
+          processingAt: admin.firestore.FieldValue.serverTimestamp(),
+          errorMessage: null,
+        });
+
+        const result = await sendScheduledCampaign(campaignId, campaign);
+
+        await campaignRef.update({
+          status: "sent",
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+          totalRecipients: result.totalRecipients,
+          appSent: result.appSent,
+          emailSent: result.emailSent,
+          readCount: 0,
+          errorMessage: null,
+        });
+
+        console.log("Campaña programada enviada:", campaignId);
+      } catch (error) {
+        console.error("Error enviando campaña programada:", campaignId, error);
+
+        await campaignRef.update({
+          status: "failed",
+          failedAt: admin.firestore.FieldValue.serverTimestamp(),
+          errorMessage: error.message || "Error desconocido",
+        });
+      }
+    }
+  },
+);
+
+async function sendScheduledCampaign(campaignId, campaign) {
+  const {
+    title,
+    message,
+    category,
+    target,
+    userId,
+    sendApp,
+    sendEmail,
+    priority,
+  } = campaign;
+
+  if (!title || !message) {
+    throw new Error("La campaña no tiene título o mensaje.");
+  }
+
+  const usersSnapshot = await admin.firestore().collection("users").get();
+
+  let totalRecipients = 0;
+  let appSent = 0;
+  let emailSent = 0;
+
+  for (const userDoc of usersSnapshot.docs) {
+    const userData = userDoc.data();
+    const uid = userDoc.id;
+
+    const role = userData.role || "user";
+    const isActive = userData.isActive !== false;
+    const isBlocked = userData.isBlocked === true;
+
+    if (role === "admin") continue;
+
+    if (target === "active" && !isActive) continue;
+    if (target === "inactive" && isActive) continue;
+    if (target === "blocked" && !isBlocked) continue;
+    if (target === "specific_user" && uid !== userId) continue;
+
+    totalRecipients++;
+
+    if (sendApp) {
+      await createInAppNotification(uid, title, message, {
+        type: category,
+        priority,
+        source: "admin_panel",
+        campaignId,
+      });
+
+      appSent++;
+
+      try {
+        await sendPushNotificationToUser(userData, title, message);
+      } catch (pushError) {
+        console.error("Error enviando push programado:", pushError);
+      }
+    }
+
+    if (sendEmail && userData.email) {
+      try {
+        await transporter.sendMail({
+          from: `"KYBO App" <${emailUser}>`,
+          to: userData.email,
+          subject: title,
+          html: buildKyboEmailTemplate({
+            preheader: title,
+            title,
+            message,
+            buttonText: "Abrir KYBO",
+            buttonUrl: "#",
+            userName: userData.name || "",
+            badge: "Campaña programada",
+          }),
+        });
+
+        emailSent++;
+      } catch (emailError) {
+        console.error("Error enviando email programado:", emailError);
+      }
+    }
+  }
+
+  return {
+    totalRecipients,
+    appSent,
+    emailSent,
+  };
+}
+
 /// ==============================
 /// MARCAR NOTIFICACIÓN COMO LEÍDA
 /// ==============================
@@ -762,6 +918,7 @@ Object.assign(
     toNumber,
     createInAppNotification,
     sendPushNotificationToUser,
+    buildKyboEmailTemplate,
   }),
 );
 
@@ -776,5 +933,6 @@ Object.assign(
     toNumber,
     createInAppNotification,
     sendPushNotificationToUser,
+    buildKyboEmailTemplate,
   }),
 );
