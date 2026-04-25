@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart'; // 🔥 NUEVO
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,7 +27,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // 🔥 CARGAR ENV
+    // CARGAR ENV
     await dotenv.load(fileName: ".env");
 
     await Firebase.initializeApp(
@@ -95,7 +95,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 SOLUCIÓN AL VERDE FOSFORESCENTE
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Color(0xFF2B2257),
@@ -120,10 +119,10 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
 
-      /// 🔥 CONTROL GLOBAL DE SESIÓN
+      /// CONTROL GLOBAL DE SESIÓN
       home: const AuthWrapper(),
 
-      /// 🔥 RUTAS
+      /// RUTAS
       routes: {
         '/login': (context) {
           final user = FirebaseAuth.instance.currentUser;

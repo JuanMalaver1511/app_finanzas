@@ -8,6 +8,8 @@ module.exports = ({
   createInAppNotification,
   sendPushNotificationToUser,
   buildKyboEmailTemplate,
+  createNotificationCampaign,
+  buildTrackingUrl,
 }) => {
   const formatCOP = (value) =>
     Number(value || 0).toLocaleString("es-CO", {
@@ -50,12 +52,34 @@ module.exports = ({
     const alreadySent = await wasSentRecently(uid, dedupeKey, 7);
     if (alreadySent) return;
 
+    const campaignRef = await createNotificationCampaign({
+      title,
+      message: body,
+      category: type,
+      campaignType: "budget_auto",
+      source: "budget_automation",
+      target: "automatic",
+      sendApp: true,
+      sendEmail,
+      priority,
+      metadata: {
+        userId: uid,
+        dedupeKey,
+      },
+    });
+
+    let appSent = 0;
+    let emailSent = 0;
+
     await createInAppNotification(uid, title, body, {
       type,
       priority,
       source: "budget_auto",
       dedupeKey,
+      campaignId: campaignRef.id,
     });
+
+    appSent = 1;
 
     try {
       const pushResult = await sendPushNotificationToUser(
@@ -89,15 +113,17 @@ module.exports = ({
             preheader: title,
             title,
             message: `
-              <p>${body}</p>
-              <p style="margin-top:16px;">Ingresa a KYBO para revisar tu presupuesto y ajustar tus gastos.</p>
-            `,
+            <p>${body}</p>
+            <p style="margin-top:16px;">Ingresa a KYBO para revisar tu presupuesto y ajustar tus gastos.</p>
+          `,
             buttonText: "Revisar presupuesto",
-            buttonUrl: "#",
+            buttonUrl: `https://trackemailclick-wnfkevrrxa-uc.a.run.app?campaignId=${campaignRef.id}&uid=${uid}&destination=${encodeURIComponent("https://control-financiero-app-b9f91.web.app/#/budgets")}`,
             userName: userData.name || "",
             badge: "Alerta de presupuesto",
           }),
         });
+
+        emailSent = 1;
       } catch (error) {
         console.error(
           `❌ Error email presupuesto para ${userData.email}:`,
@@ -105,6 +131,12 @@ module.exports = ({
         );
       }
     }
+
+    await campaignRef.update({
+      appSent,
+      emailSent,
+      totalRecipients: 1,
+    });
   }
 
   const checkBudgetOnExpenseCreated = onDocumentCreated(

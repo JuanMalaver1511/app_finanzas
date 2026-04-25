@@ -1,11 +1,26 @@
 require("dotenv").config();
 
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const {
+  onCall,
+  onRequest,
+  HttpsError,
+} = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const functionsV1 = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const { buildKyboEmailTemplate } = require("./emailTemplates");
+const APP_URL = "https://control-financiero-app-b9f91.web.app";
+
+function buildTrackingUrl({
+  campaignId,
+  uid,
+  targetPath = "/#/notifications",
+}) {
+  const destination = encodeURIComponent(`${APP_URL}${targetPath}`);
+
+  return `https://trackemailclick-wnfkevrrxa-uc.a.run.app?campaignId=${campaignId}&uid=${uid}&destination=${destination}`;
+}
 
 admin.initializeApp();
 
@@ -55,6 +70,112 @@ async function assertAdmin(uid) {
     );
   }
 }
+
+async function registerUniqueInteraction({ campaignRef, uid, channel }) {
+  if (!uid) return;
+
+  const interactionRef = campaignRef.collection("interactions").doc(uid);
+  const interactionDoc = await interactionRef.get();
+
+  const updateData = {
+    uid,
+    lastInteractionAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (channel === "email") {
+    updateData.emailClick = true;
+    updateData.lastEmailClickAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  if (channel === "app") {
+    updateData.appRead = true;
+    updateData.lastAppReadAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  await interactionRef.set(updateData, { merge: true });
+
+  if (!interactionDoc.exists) {
+    await campaignRef.set(
+      {
+        uniqueInteractionCount: admin.firestore.FieldValue.increment(1),
+        lastInteractionAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } else {
+    await campaignRef.set(
+      {
+        lastInteractionAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+}
+
+exports.trackEmailClick = onRequest(
+  {
+    region: "us-central1",
+    cors: true,
+  },
+  async (req, res) => {
+    try {
+      const campaignId = req.query.campaignId?.toString();
+      const uid = req.query.uid?.toString();
+      const destination =
+        req.query.destination?.toString() || `${APP_URL}/#/notifications`;
+
+      if (campaignId) {
+        const campaignRef = admin
+          .firestore()
+          .collection("notification_campaigns")
+          .doc(campaignId);
+
+        const clickId = uid || `anonymous_${Date.now()}`;
+
+        const clickRef = campaignRef.collection("email_clicks").doc(clickId);
+        const clickDoc = await clickRef.get();
+
+        if (!clickDoc.exists) {
+          await campaignRef.set(
+            {
+              emailClickCount: admin.firestore.FieldValue.increment(1),
+              lastEmailClickAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+
+          await clickRef.set({
+            uid: uid || null,
+            firstClickAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastClickAt: admin.firestore.FieldValue.serverTimestamp(),
+            clickCount: 1,
+            userAgent: req.headers["user-agent"] || null,
+            ip:
+              req.headers["x-forwarded-for"]?.toString().split(",")[0] ||
+              req.ip ||
+              null,
+          });
+
+          await registerUniqueInteraction({
+            campaignRef,
+            uid,
+            channel: "email",
+          });
+        } else {
+          await clickRef.update({
+            lastClickAt: admin.firestore.FieldValue.serverTimestamp(),
+            clickCount: admin.firestore.FieldValue.increment(1),
+          });
+        }
+      }
+
+      return res.redirect(destination);
+    } catch (error) {
+      console.error("Error registrando clic de correo:", error);
+      return res.redirect(`${APP_URL}/#/notifications`);
+    }
+  },
+);
 
 /// ==============================
 /// CREAR USUARIO DESDE ADMIN
@@ -298,6 +419,54 @@ async function createInAppNotification(uid, title, body, options = {}) {
     });
 }
 
+async function createNotificationCampaign({
+  title,
+  message,
+  category,
+  campaignType,
+  source,
+  target = "all",
+  sendApp = true,
+  sendEmail = false,
+  priority = "medium",
+  status = "sent",
+  scheduledAt = null,
+  metadata = {},
+}) {
+  const campaignRef = await admin
+    .firestore()
+    .collection("notification_campaigns")
+    .add({
+      title,
+      message,
+      category,
+      campaignType,
+      source,
+      target,
+      sendApp,
+      sendEmail,
+      priority,
+      status,
+      scheduledAt,
+      sentAt:
+        status === "sent" ? admin.firestore.FieldValue.serverTimestamp() : null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+
+      totalRecipients: 0,
+      appSent: 0,
+      emailSent: 0,
+      readCount: 0,
+      emailClickCount: 0,
+      lastEmailClickAt: null,
+      uniqueInteractionCount: 0,
+      lastInteractionAt: null,
+
+      ...metadata,
+    });
+
+  return campaignRef;
+}
+
 async function sendPushNotificationToUser(userData, title, body) {
   const tokens = Array.isArray(userData.notificationTokens)
     ? userData.notificationTokens.filter(
@@ -525,7 +694,7 @@ async function sendDebtReminderEmailsManual() {
             <p style="margin-top:16px;">Revisa tu app para registrar tu pago.</p>
           `,
           buttonText: "Revisar mis deudas",
-          buttonUrl: "#",
+          buttonUrl: `${APP_URL}/#/debts`,
           userName: name,
           badge: "Recordatorio financiero",
         }),
@@ -600,6 +769,7 @@ exports.sendCustomNotification = onCall(
         sendEmail,
         priority,
         status: "sent",
+        source: "admin_panel",
         scheduledAt: null,
         sentAt: admin.firestore.FieldValue.serverTimestamp(),
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -607,6 +777,10 @@ exports.sendCustomNotification = onCall(
         appSent: 0,
         emailSent: 0,
         readCount: 0,
+        emailClickCount: 0,
+        lastEmailClickAt: null,
+        uniqueInteractionCount: 0,
+        lastInteractionAt: null,
       });
 
     for (const userDoc of usersSnapshot.docs) {
@@ -654,7 +828,11 @@ exports.sendCustomNotification = onCall(
               title,
               message,
               buttonText: "Abrir KYBO",
-              buttonUrl: "#",
+              buttonUrl: buildTrackingUrl({
+                campaignId: campaignRef.id,
+                uid,
+                targetPath: "/#/notifications",
+              }),
               userName: userData.name || "",
               badge: "Nueva notificación",
             }),
@@ -727,7 +905,11 @@ exports.processScheduledNotifications = onSchedule(
           totalRecipients: result.totalRecipients,
           appSent: result.appSent,
           emailSent: result.emailSent,
-          readCount: 0,
+          readCount: campaign.readCount || 0,
+          emailClickCount: campaign.emailClickCount || 0,
+          lastEmailClickAt: campaign.lastEmailClickAt || null,
+          uniqueInteractionCount: campaign.uniqueInteractionCount || 0,
+          lastInteractionAt: campaign.lastInteractionAt || null,
           errorMessage: null,
         });
 
@@ -812,7 +994,11 @@ async function sendScheduledCampaign(campaignId, campaign) {
             title,
             message,
             buttonText: "Abrir KYBO",
-            buttonUrl: "#",
+            buttonUrl: buildTrackingUrl({
+              campaignId,
+              uid,
+              targetPath: "/#/notifications",
+            }),
             userName: userData.name || "",
             badge: "Campaña programada",
           }),
@@ -894,7 +1080,28 @@ exports.markNotificationAsRead = onCall(
 
         transaction.update(campaignRef, {
           readCount: admin.firestore.FieldValue.increment(1),
+          lastInteractionAt: admin.firestore.FieldValue.serverTimestamp(),
         });
+
+        const interactionRef = campaignRef.collection("interactions").doc(uid);
+        const interactionDoc = await transaction.get(interactionRef);
+
+        transaction.set(
+          interactionRef,
+          {
+            uid,
+            appRead: true,
+            lastAppReadAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastInteractionAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+
+        if (!interactionDoc.exists) {
+          transaction.update(campaignRef, {
+            uniqueInteractionCount: admin.firestore.FieldValue.increment(1),
+          });
+        }
       }
 
       return {
@@ -919,6 +1126,8 @@ Object.assign(
     createInAppNotification,
     sendPushNotificationToUser,
     buildKyboEmailTemplate,
+    createNotificationCampaign,
+    buildTrackingUrl,
   }),
 );
 
@@ -934,5 +1143,7 @@ Object.assign(
     createInAppNotification,
     sendPushNotificationToUser,
     buildKyboEmailTemplate,
+    createNotificationCampaign,
+    buildTrackingUrl,
   }),
 );
