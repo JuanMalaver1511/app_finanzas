@@ -1852,6 +1852,10 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     final category = (data['category'] ?? 'general').toString();
     final target = (data['target'] ?? 'all').toString();
 
+    final status = (data['status'] ?? 'sent').toString();
+    final scheduledAt = data['scheduledAt'];
+    final sentAt = data['sentAt'];
+
     final totalRecipients = _asInt(data['totalRecipients']);
     final appSent = _asInt(data['appSent']);
     final emailSent = _asInt(data['emailSent']);
@@ -1861,12 +1865,9 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
 
     final createdAt = data['createdAt'];
 
-    String dateText = 'Fecha no disponible';
-    if (createdAt is Timestamp) {
-      final date = createdAt.toDate();
-      dateText =
-          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    }
+    final createdText = _formatDateTime(createdAt);
+    final scheduledText = _formatDateTime(scheduledAt);
+    final sentText = _formatDateTime(sentAt);
 
     final impactColor = _impactColor(impact);
 
@@ -1876,7 +1877,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: impactColor.withOpacity(.25)),
+        border: Border.all(color: _statusColor(status).withOpacity(.25)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(.035),
@@ -1895,10 +1896,19 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    _badge(_statusLabel(status), _statusColor(status)),
                     _badge(_categoryLabel(category), _primary),
                     _badge(_targetLabel(target), Colors.blueGrey),
-                    _badge(dateText, Colors.grey),
-                    _badge("Lectura $impact%", impactColor),
+                    _badge("Creada: $createdText", Colors.grey),
+                    if (status == 'scheduled')
+                      _badge("Programada: $scheduledText", Colors.blue),
+                    if (status == 'sending')
+                      _badge("Procesando envío", Colors.orange),
+                    if (status == 'sent')
+                      _badge("Enviada: $sentText", Colors.green),
+                    if (status == 'failed') _badge("Fallida", Colors.red),
+                    if (status == 'sent')
+                      _badge("Lectura $impact%", impactColor),
                   ],
                 ),
               ),
@@ -2256,6 +2266,54 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         return 'Usuario específico';
       default:
         return value;
+    }
+  }
+
+  String _formatDateTime(dynamic value) {
+    if (value is! Timestamp) return 'No disponible';
+
+    final date = value.toDate();
+
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+
+    return '$day/$month/$year · $hour:$minute';
+  }
+
+  String _statusLabel(String value) {
+    switch (value) {
+      case 'scheduled':
+        return 'Programada';
+      case 'sending':
+        return 'Enviando';
+      case 'sent':
+        return 'Enviada';
+      case 'failed':
+        return 'Fallida';
+      case 'cancelled':
+        return 'Cancelada';
+      default:
+        return 'Enviada';
+    }
+  }
+
+  Color _statusColor(String value) {
+    switch (value) {
+      case 'scheduled':
+        return Colors.blue;
+      case 'sending':
+        return Colors.orange;
+      case 'sent':
+        return Colors.green;
+      case 'failed':
+        return Colors.red;
+      case 'cancelled':
+        return Colors.grey;
+      default:
+        return Colors.green;
     }
   }
 }
