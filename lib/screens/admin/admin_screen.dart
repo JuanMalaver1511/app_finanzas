@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import '../../widgets/admin/sidebar_icon.dart';
 import '../auth/auth_wrapper.dart';
 
@@ -32,7 +31,6 @@ class _AdminScreenState extends State<AdminScreen> {
   int neverLoggedUsers = 0;
 
   bool isLoading = true;
-  bool isSendingNotification = false;
 
   double activePercent = 0;
   double inactivePercent = 0;
@@ -153,59 +151,6 @@ class _AdminScreenState extends State<AdminScreen> {
         MaterialPageRoute(builder: (_) => const AuthWrapper()),
         (route) => false,
       );
-    }
-  }
-
-  Future<void> _sendManualFinanceNotification() async {
-    if (isSendingNotification) return;
-
-    setState(() => isSendingNotification = true);
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw FirebaseFunctionsException(
-          code: 'unauthenticated',
-          message: 'No hay una sesion activa en Firebase Auth.',
-        );
-      }
-
-      await user.getIdToken(true);
-
-      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
-          .httpsCallable('sendFinanceNotificationsToAllUsers');
-      final result = await callable.call();
-      final data = Map<String, dynamic>.from(result.data as Map);
-      final enviados = data['sentCount'] ?? 0;
-      final procesados = data['processedUsers'] ?? 0;
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Notificaciones enviadas: $enviados de $procesados usuarios procesados.',
-          ),
-        ),
-      );
-    } on FirebaseFunctionsException catch (e) {
-      if (!mounted) return;
-      final message = e.message ?? e.code;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No se pudo enviar la notificacion masiva: $message'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No se pudo enviar la notificacion masiva: $e'),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => isSendingNotification = false);
-      }
     }
   }
 
@@ -473,8 +418,6 @@ class _AdminScreenState extends State<AdminScreen> {
                         "${blockedPercent.toStringAsFixed(1)}%", _danger),
                   ],
                 ),
-                const SizedBox(height: 14),
-                _buildManualNotificationButton(isFullWidth: true),
               ],
             )
           : Row(
@@ -505,46 +448,10 @@ class _AdminScreenState extends State<AdminScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    _buildManualNotificationButton(),
                   ],
                 ),
               ],
             ),
-    );
-  }
-
-  Widget _buildManualNotificationButton({bool isFullWidth = false}) {
-    return SizedBox(
-      width: isFullWidth ? double.infinity : null,
-      child: ElevatedButton.icon(
-        onPressed:
-            isSendingNotification ? null : _sendManualFinanceNotification,
-        icon: isSendingNotification
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: _kyboPrimary,
-                ),
-              )
-            : const Icon(Icons.send_rounded),
-        label: Text(
-          isSendingNotification
-              ? 'Enviando...'
-              : 'Enviar notificaciones',
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _kyboAccent,
-          foregroundColor: _kyboPrimary,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
     );
   }
 
@@ -698,11 +605,11 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
       _DashboardCardData(
         icon: Icons.notifications_active_rounded,
-        title: "Notificaciones",
-        value: "Pendiente",
-        subtitle: "Módulo listo para seguimiento y envíos",
+        title: "Centro de mensajes",
+        value: "Activo",
+        subtitle: "Campañas, historial y automatizaciones configuradas",
         color: const Color(0xFF8B5CF6),
-        cta: "Ir a notificaciones",
+        cta: "Gestionar mensajes",
         onTap: () => Navigator.pushNamed(context, '/notifications'),
       ),
     ];

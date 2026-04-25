@@ -38,30 +38,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'month_without_budget':
         return Icons.account_balance_wallet_outlined;
+
       case 'budget_auto_created':
         return Icons.auto_awesome_rounded;
+
       case 'budget_warning':
         return Icons.warning_amber_rounded;
+
       case 'budget_exceeded':
         return Icons.error_outline_rounded;
+
+      case 'budget_critical':
+        return Icons.warning_rounded;
+
       case 'budget_over_income':
         return Icons.insights_outlined;
+
+      case 'finance_alert':
+      case 'spending_alert':
+        return Icons.trending_down_rounded;
+
+      case 'weekly_finance_summary':
+        return Icons.bar_chart_rounded;
+
+      case 'no_movements_reminder':
+        return Icons.hourglass_empty_rounded;
+
+      case 'weekly_motivation':
+        return Icons.emoji_events_outlined;
+
+      case 'debt_alert':
+        return Icons.account_balance_rounded;
+
       case 'debt_overdue':
         return Icons.warning_amber_rounded;
+
       case 'debt_upcoming':
         return Icons.calendar_today_rounded;
+
       case 'goal_at_risk':
         return Icons.track_changes_rounded;
+
       case 'goal_delayed':
         return Icons.timelapse_rounded;
+
       case 'income_expected':
         return Icons.payments_outlined;
+
       case 'income_received':
         return Icons.check_circle_outline_rounded;
+
       case 'admin_message':
         return Icons.campaign_outlined;
+
       case 'system_update':
         return Icons.system_update_alt_rounded;
+
       default:
         return Icons.notifications_none_rounded;
     }
@@ -71,28 +103,54 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (n.type) {
       case 'month_without_budget':
         return kPrimary;
+
       case 'budget_warning':
         return kAmber;
+
       case 'budget_exceeded':
+      case 'budget_critical':
       case 'budget_over_income':
         return kRed;
+
       case 'budget_auto_created':
         return kSuccess;
+
+      case 'finance_alert':
+      case 'spending_alert':
+        return kRed;
+
+      case 'weekly_finance_summary':
+        return kInfo;
+
+      case 'no_movements_reminder':
+        return kAmber;
+
+      case 'weekly_motivation':
+        return kSuccess;
+
+      case 'debt_alert':
       case 'debt_overdue':
         return kRed;
+
       case 'debt_upcoming':
         return kAmber;
+
       case 'goal_at_risk':
         return kAmber;
+
       case 'goal_delayed':
         return kRed;
+
       case 'income_expected':
         return kInfo;
+
       case 'income_received':
         return kSuccess;
+
       case 'admin_message':
       case 'system_update':
         return kInfo;
+
       default:
         return _colorForPriority(n.priority);
     }
@@ -130,30 +188,64 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (type) {
       case 'month_without_budget':
         return 'Presupuesto';
+
       case 'budget_auto_created':
         return 'Automático';
+
       case 'budget_warning':
         return 'Advertencia';
+
       case 'budget_exceeded':
         return 'Excedido';
+
+      case 'budget_critical':
+        return 'Crítico';
+
       case 'budget_over_income':
         return 'Riesgo';
-      case 'debt_overdue':
+
+      case 'finance_alert':
+        return 'Balance';
+
+      case 'spending_alert':
+        return 'Gastos';
+
+      case 'weekly_finance_summary':
+        return 'Resumen';
+
+      case 'no_movements_reminder':
+        return 'Recordatorio';
+
+      case 'weekly_motivation':
+        return 'Motivación';
+
+      case 'debt_alert':
         return 'Deuda';
+
+      case 'debt_overdue':
+        return 'Deuda vencida';
+
       case 'debt_upcoming':
         return 'Próximo pago';
+
       case 'goal_at_risk':
         return 'Meta en riesgo';
+
       case 'goal_delayed':
         return 'Meta atrasada';
+
       case 'income_expected':
         return 'Ingreso';
+
       case 'income_received':
         return 'Confirmado';
+
       case 'admin_message':
         return 'Admin';
+
       case 'system_update':
         return 'Sistema';
+
       default:
         return 'Notificación';
     }

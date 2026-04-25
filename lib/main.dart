@@ -20,6 +20,7 @@ import 'screens/admin/admin_screen.dart';
 import 'screens/admin/users_screen.dart';
 import 'screens/admin/activity_screen.dart';
 import 'screens/admin/security_screen.dart';
+import 'screens/admin/notifications_admin_screen.dart';
 import 'screens/profile/profile_screen.dart';
 
 Future<void> main() async {
@@ -69,13 +70,35 @@ class MyApp extends StatelessWidget {
     }
   }
 
+  Widget _adminGuard(Widget screen) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) return const LoginScreen();
+
+    return FutureBuilder<String?>(
+      future: _getUserRole(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.data != 'admin') {
+          return const AuthWrapper();
+        }
+
+        return screen;
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-
     // 🔥 SOLUCIÓN AL VERDE FOSFORESCENTE
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
-        statusBarColor: Color(0xFF2B2257), // puedes cambiar a blanco si quieres
+        statusBarColor: Color(0xFF2B2257),
         statusBarIconBrightness: Brightness.light,
       ),
     );
@@ -111,91 +134,18 @@ class MyApp extends StatelessWidget {
 
           return const LoginScreen();
         },
-        '/admin': (context) {
-          final user = FirebaseAuth.instance.currentUser;
 
-          if (user == null) return const LoginScreen();
+        '/admin': (context) => _adminGuard(const AdminScreen()),
 
-          return FutureBuilder<String?>(
-            future: _getUserRole(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
+        '/users': (context) => _adminGuard(const UsersScreen()),
 
-              if (snapshot.data != 'admin') {
-                return const AuthWrapper();
-              }
+        '/activity': (context) => _adminGuard(const ActivityScreen()),
 
-              return const AdminScreen();
-            },
-          );
-        },
-        '/users': (context) {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user == null) return const LoginScreen();
+        '/security': (context) => _adminGuard(const SecurityScreen()),
 
-          return FutureBuilder<String?>(
-            future: _getUserRole(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
+        '/notifications': (context) =>
+            _adminGuard(const NotificationsAdminScreen()),
 
-              if (snapshot.data != 'admin') {
-                return const AuthWrapper();
-              }
-
-              return const UsersScreen();
-            },
-          );
-        },
-        '/activity': (context) {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user == null) return const LoginScreen();
-
-          return FutureBuilder<String?>(
-            future: _getUserRole(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (snapshot.data != 'admin') {
-                return const AuthWrapper();
-              }
-
-              return const ActivityScreen();
-            },
-          );
-        },
-        '/security': (context) {
-          final user = FirebaseAuth.instance.currentUser;
-          if (user == null) return const LoginScreen();
-
-          return FutureBuilder<String?>(
-            future: _getUserRole(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (snapshot.data != 'admin') {
-                return const AuthWrapper();
-              }
-
-              return const SecurityScreen();
-            },
-          );
-        },
         '/profile': (context) {
           final user = FirebaseAuth.instance.currentUser;
           if (user == null) return const LoginScreen();
