@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../models/app_notification.dart';
 
 class NotificationService {
@@ -6,12 +7,15 @@ class NotificationService {
 
   NotificationService(this.uid);
 
-  CollectionReference<Map<String, dynamic>> get _ref => FirebaseFirestore
-      .instance
-      .collection('users')
-      .doc(uid)
-      .collection('notifications');
+  CollectionReference<Map<String, dynamic>> get _ref =>
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('notifications');
 
+  /// ==============================
+  /// TIEMPO DE VIDA DE NOTIFICACIONES
+  /// ==============================
   Duration _durationForType(String type) {
     switch (type) {
       case 'budget_auto_created':
@@ -46,6 +50,9 @@ class NotificationService {
     }
   }
 
+  /// ==============================
+  /// STREAMS
+  /// ==============================
   Stream<List<AppNotification>> stream() {
     return _ref.orderBy('createdAt', descending: true).snapshots().map(
           (snap) => snap.docs
@@ -86,12 +93,25 @@ class NotificationService {
         .map((snap) => snap.docs.length);
   }
 
+  /// ==============================
+  /// MARCAR COMO LEÍDA (CLAVE)
+  /// ==============================
   Future<void> markAsRead(String id) async {
-    await _ref.doc(id).update({
-      'isRead': true,
-    });
+    try {
+      final callable = FirebaseFunctions.instanceFor(region: 'us-central1')
+          .httpsCallable('markNotificationAsRead');
+
+      await callable.call({
+        'notificationId': id,
+      });
+    } catch (e) {
+      print("Error marcando como leída: $e");
+    }
   }
 
+  /// ==============================
+  /// MARCAR TODAS COMO LEÍDAS
+  /// ==============================
   Future<void> markAllAsRead() async {
     final now = Timestamp.now();
 
@@ -113,10 +133,16 @@ class NotificationService {
     await batch.commit();
   }
 
+  /// ==============================
+  /// ELIMINAR
+  /// ==============================
   Future<void> delete(String id) async {
     await _ref.doc(id).delete();
   }
 
+  /// ==============================
+  /// CREAR NOTIFICACIÓN
+  /// ==============================
   Future<void> create({
     required String title,
     required String message,
@@ -138,6 +164,9 @@ class NotificationService {
     });
   }
 
+  /// ==============================
+  /// EVITAR DUPLICADOS
+  /// ==============================
   Future<bool> existsByDedupeKey(String dedupeKey) async {
     final now = Timestamp.now();
 

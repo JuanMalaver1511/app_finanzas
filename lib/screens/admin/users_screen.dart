@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'user_detail_screen.dart';
 import 'user_create_screen.dart';
+import 'dart:async';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({super.key});
@@ -22,8 +23,12 @@ class _UsersScreenState extends State<UsersScreen> {
 
   static const int _inactiveThresholdDays = 8;
 
-  String search = "";
-  String selectedFilter = "Todos";
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+
+  final ValueNotifier<String> _searchQuery = ValueNotifier<String>("");
+  final ValueNotifier<String> _selectedFilterNotifier =
+      ValueNotifier<String>("Todos");
 
   final List<String> filters = const [
     "Todos",
@@ -124,20 +129,6 @@ class _UsersScreenState extends State<UsersScreen> {
         false;
   }
 
-  Future<void> _deleteUser(String userId) async {
-    final confirm = await _confirmDelete();
-    if (!confirm) return;
-
-    await FirebaseFirestore.instance.collection('users').doc(userId).delete();
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Usuario eliminado correctamente"),
-      ),
-    );
-  }
-
   bool _isBlocked(Map<String, dynamic> data) {
     return data['isBlocked'] == true || data['isActive'] == false;
   }
@@ -229,26 +220,6 @@ class _UsersScreenState extends State<UsersScreen> {
     return "No disponible";
   }
 
-  bool _matchesFilter(Map<String, dynamic> data) {
-    final status = _statusLabel(data);
-    final role = (data['role'] ?? 'user').toString().toLowerCase();
-
-    switch (selectedFilter) {
-      case "Activos":
-        return status == "Activo";
-      case "Inactivos":
-        return status == "Inactivo";
-      case "Bloqueados":
-        return status == "Bloqueado";
-      case "Nunca ingresaron":
-        return status == "Nunca ingresó";
-      case "Admins":
-        return role == 'admin';
-      default:
-        return true;
-    }
-  }
-
   Map<String, int> _calculateStats(List<QueryDocumentSnapshot> docs) {
     int total = docs.length;
     int active = 0;
@@ -276,6 +247,53 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchQuery.dispose();
+    _selectedFilterNotifier.dispose();
+    super.dispose();
+  }
+
+  List<QueryDocumentSnapshot> _filterUsers(
+    List<QueryDocumentSnapshot> docs,
+    String query,
+    String filter,
+  ) {
+    return docs.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+
+      final name = (data['name'] ?? '').toString().toLowerCase();
+      final email = (data['email'] ?? '').toString().toLowerCase();
+      final role = (data['role'] ?? '').toString().toLowerCase();
+
+      final matchesSearch = query.isEmpty ||
+          name.contains(query) ||
+          email.contains(query) ||
+          role.contains(query);
+
+      if (!matchesSearch) return false;
+
+      final status = _statusLabel(data);
+
+      switch (filter) {
+        case "Activos":
+          return status == "Activo";
+        case "Inactivos":
+          return status == "Inactivo";
+        case "Bloqueados":
+          return status == "Bloqueado";
+        case "Nunca ingresaron":
+          return status == "Nunca ingresó";
+        case "Admins":
+          return role == 'admin';
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final isMobile = size.width < 700;
@@ -299,24 +317,6 @@ class _UsersScreenState extends State<UsersScreen> {
                   final docs = snapshot.data?.docs ?? [];
                   final stats = _calculateStats(docs);
 
-                  final filtered = docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final name =
-                        (data['name'] ?? '').toString().toLowerCase();
-                    final email =
-                        (data['email'] ?? '').toString().toLowerCase();
-                    final role =
-                        (data['role'] ?? '').toString().toLowerCase();
-
-                    final matchesSearch = name.contains(search) ||
-                        email.contains(search) ||
-                        role.contains(search);
-
-                    final matchesFilter = _matchesFilter(data);
-
-                    return matchesSearch && matchesFilter;
-                  }).toList();
-
                   return RefreshIndicator(
                     onRefresh: () async => _refresh(),
                     color: _kyboPrimary,
@@ -339,26 +339,39 @@ class _UsersScreenState extends State<UsersScreen> {
                           const SizedBox(height: 18),
                           _statsGrid(stats, isMobile, isTablet),
                           const SizedBox(height: 18),
-                          _sectionTitle(
-                            title: "Listado de usuarios",
-                            subtitle:
-                                "${filtered.length} resultado(s) según búsqueda y filtro actual",
+                          ValueListenableBuilder<String>(
+                            valueListenable: _searchQuery,
+                            builder: (context, query, _) {
+                              return ValueListenableBuilder<String>(
+                                valueListenable: _selectedFilterNotifier,
+                                builder: (context, filter, _) {
+                                  final filtered =
+                                      _filterUsers(docs, query, filter);
+
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      _sectionTitle(
+                                        title: "Listado de usuarios",
+                                        subtitle:
+                                            "${filtered.length} resultado(s) según búsqueda y filtro actual",
+                                      ),
+                                      const SizedBox(height: 12),
+                                      if (filtered.isEmpty)
+                                        _emptyState()
+                                      else
+                                        Column(
+                                          children: filtered
+                                              .map((doc) => _userCard(doc))
+                                              .toList(),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
                           ),
-                          const SizedBox(height: 12),
-                          if (filtered.isEmpty)
-                            _emptyState()
-                          else
-                            isMobile
-                                ? Column(
-                                    children: filtered
-                                        .map((doc) => _userCard(doc))
-                                        .toList(),
-                                  )
-                                : Column(
-                                    children: filtered
-                                        .map((doc) => _userCard(doc))
-                                        .toList(),
-                                  ),
                         ],
                       ),
                     ),
@@ -374,7 +387,8 @@ class _UsersScreenState extends State<UsersScreen> {
 
   Widget _header(BuildContext context, bool isMobile) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 22, 14, isMobile ? 16 : 22, 6),
+      padding:
+          EdgeInsets.fromLTRB(isMobile ? 16 : 22, 14, isMobile ? 16 : 22, 6),
       child: Row(
         children: [
           Container(
@@ -602,17 +616,29 @@ class _UsersScreenState extends State<UsersScreen> {
         ],
       ),
       child: TextField(
+        controller: _searchController,
         onChanged: (value) {
-          setState(() => search = value.toLowerCase().trim());
+          _searchDebounce?.cancel();
+
+          _searchDebounce = Timer(const Duration(milliseconds: 700), () {
+            if (!mounted) return;
+
+            final newValue = value.toLowerCase().trim();
+            if (_searchQuery.value == newValue) return;
+
+            _searchQuery.value = newValue;
+          });
         },
         decoration: InputDecoration(
           hintText: "Buscar por nombre, correo o rol...",
           hintStyle: TextStyle(color: Colors.grey.shade500),
           prefixIcon: const Icon(Icons.search_rounded, color: _kyboPrimary),
-          suffixIcon: search.isNotEmpty
+          suffixIcon: _searchQuery.value.isNotEmpty
               ? IconButton(
                   onPressed: () {
-                    setState(() => search = "");
+                    _searchDebounce?.cancel();
+                    _searchController.clear();
+                    _searchQuery.value = "";
                   },
                   icon: const Icon(Icons.close_rounded),
                 )
@@ -635,24 +661,23 @@ class _UsersScreenState extends State<UsersScreen> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: filters.map((filter) {
-          final isSelected = selectedFilter == filter;
+          final isSelected = _selectedFilterNotifier.value == filter;
           return Padding(
             padding: const EdgeInsets.only(right: 10),
             child: InkWell(
               onTap: () {
-                setState(() => selectedFilter = filter);
+                _selectedFilterNotifier.value = filter;
               },
               borderRadius: BorderRadius.circular(999),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected ? _kyboPrimary : Colors.white,
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: isSelected
-                        ? _kyboPrimary
-                        : const Color(0xFFE7E9F1),
+                    color: isSelected ? _kyboPrimary : const Color(0xFFE7E9F1),
                   ),
                   boxShadow: [
                     BoxShadow(
@@ -844,7 +869,10 @@ class _UsersScreenState extends State<UsersScreen> {
       confirmDismiss: (_) async {
         final confirm = await _confirmDelete();
         if (confirm) {
-          await FirebaseFirestore.instance.collection('users').doc(doc.id).delete();
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(doc.id)
+              .delete();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Usuario eliminado correctamente")),
