@@ -38,6 +38,8 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
   bool sendApp = true;
   bool sendEmail = false;
   bool isSending = false;
+  bool scheduleMessage = false;
+  DateTime? scheduledDateTime;
 
   @override
   void dispose() {
@@ -46,6 +48,38 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     userSearchController.dispose();
     historySearchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickScheduleDateTime() async {
+    final now = DateTime.now();
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: scheduledDateTime ?? now,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+
+    if (date == null) return;
+
+    if (!mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(scheduledDateTime ?? now),
+    );
+
+    if (time == null) return;
+
+    setState(() {
+      scheduledDateTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    });
   }
 
   Future<void> _sendNotification() async {
@@ -110,6 +144,86 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
       _showMessage(e.message ?? "No se pudo enviar el mensaje.");
     } catch (e) {
       _showMessage("Error inesperado: $e");
+    } finally {
+      if (mounted) setState(() => isSending = false);
+    }
+  }
+
+  Future<void> _scheduleNotification() async {
+    final title = titleController.text.trim();
+    final message = messageController.text.trim();
+
+    if (title.isEmpty || message.isEmpty) {
+      _showMessage("Completa el título y el mensaje.");
+      return;
+    }
+
+    if (!sendApp && !sendEmail) {
+      _showMessage("Selecciona al menos un canal de envío.");
+      return;
+    }
+
+    if (selectedTarget == 'specific_user' && selectedUserId.isEmpty) {
+      _showMessage("Selecciona un usuario específico.");
+      return;
+    }
+
+    if (scheduledDateTime == null) {
+      _showMessage("Selecciona la fecha y hora de programación.");
+      return;
+    }
+
+    if (scheduledDateTime!.isBefore(DateTime.now())) {
+      _showMessage("La fecha programada debe ser futura.");
+      return;
+    }
+
+    setState(() => isSending = true);
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('notification_campaigns')
+          .add({
+        'category': selectedCategory,
+        'target': selectedTarget,
+        'userId': selectedTarget == 'specific_user' ? selectedUserId : null,
+        'title': title,
+        'message': message,
+        'sendApp': sendApp,
+        'sendEmail': sendEmail,
+        'priority': priority,
+        'status': 'scheduled',
+        'scheduledAt': Timestamp.fromDate(scheduledDateTime!),
+        'createdAt': FieldValue.serverTimestamp(),
+        'sentAt': null,
+        'totalRecipients': 0,
+        'appSent': 0,
+        'emailSent': 0,
+        'readCount': 0,
+      });
+
+      if (!mounted) return;
+
+      titleController.clear();
+      messageController.clear();
+      userSearchController.clear();
+
+      setState(() {
+        selectedCategory = 'motivational';
+        selectedTarget = 'all';
+        selectedUserId = '';
+        selectedUserName = '';
+        selectedUserEmail = '';
+        priority = 'normal';
+        sendApp = true;
+        sendEmail = false;
+        scheduleMessage = false;
+        scheduledDateTime = null;
+      });
+
+      _showMessage("Campaña programada correctamente.");
+    } catch (e) {
+      _showMessage("No se pudo programar la campaña: $e");
     } finally {
       if (mounted) setState(() => isSending = false);
     }
@@ -1049,10 +1163,16 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
               const SizedBox(height: 18),
               _messagePreview(),
               const SizedBox(height: 22),
+              _scheduleSection(),
+              const SizedBox(height: 22),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: isSending ? null : _sendNotification,
+                  onPressed: isSending
+                      ? null
+                      : scheduleMessage
+                          ? _scheduleNotification
+                          : _sendNotification,
                   icon: isSending
                       ? const SizedBox(
                           width: 18,
@@ -1064,7 +1184,11 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                         )
                       : const Icon(Icons.send_rounded),
                   label: Text(
-                    isSending ? "Enviando..." : "Enviar campaña",
+                    isSending
+                        ? "Procesando..."
+                        : scheduleMessage
+                            ? "Programar campaña"
+                            : "Enviar campaña",
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -1880,6 +2004,96 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _scheduleSection() {
+    String dateText = "Sin fecha seleccionada";
+
+    if (scheduledDateTime != null) {
+      final d = scheduledDateTime!;
+      final day = d.day.toString().padLeft(2, '0');
+      final month = d.month.toString().padLeft(2, '0');
+      final hour = d.hour.toString().padLeft(2, '0');
+      final minute = d.minute.toString().padLeft(2, '0');
+
+      dateText = "$day/$month/${d.year} · $hour:$minute";
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Programación",
+            style: TextStyle(
+              color: _primary,
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: scheduleMessage,
+            activeColor: _primary,
+            title: const Text(
+              "Programar campaña",
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            subtitle: Text(
+              scheduleMessage
+                  ? "El mensaje se enviará en la fecha seleccionada."
+                  : "El mensaje se enviará inmediatamente.",
+            ),
+            onChanged: (value) {
+              setState(() {
+                scheduleMessage = value;
+                if (!value) scheduledDateTime = null;
+              });
+            },
+          ),
+          if (scheduleMessage) ...[
+            const SizedBox(height: 10),
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: _pickScheduleDateTime,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_rounded, color: _primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        dateText,
+                        style: const TextStyle(
+                          color: _primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const Icon(Icons.edit_calendar_rounded, color: _primary),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

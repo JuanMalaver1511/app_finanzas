@@ -7,6 +7,7 @@ module.exports = ({
   toNumber,
   createInAppNotification,
   sendPushNotificationToUser,
+  buildKyboEmailTemplate,
 }) => {
   const formatCOP = (value) =>
     Number(value || 0).toLocaleString("es-CO", {
@@ -57,7 +58,11 @@ module.exports = ({
     });
 
     try {
-      const pushResult = await sendPushNotificationToUser(userData, title, body);
+      const pushResult = await sendPushNotificationToUser(
+        userData,
+        title,
+        body,
+      );
 
       if (pushResult.invalidTokens.length) {
         await admin
@@ -80,17 +85,24 @@ module.exports = ({
           from: `"KYBO App" <${emailUser}>`,
           to: userData.email,
           subject: title,
-          html: `
-            <div style="font-family: Arial, sans-serif; color:#333;">
-              <h2 style="color:#2B2257;">${title}</h2>
-              <p>Hola ${userData.name || "Usuario"},</p>
+          html: buildKyboEmailTemplate({
+            preheader: title,
+            title,
+            message: `
               <p>${body}</p>
-              <p style="margin-top:16px;">Ingresa a KYBO para revisar tu presupuesto.</p>
-            </div>
-          `,
+              <p style="margin-top:16px;">Ingresa a KYBO para revisar tu presupuesto y ajustar tus gastos.</p>
+            `,
+            buttonText: "Revisar presupuesto",
+            buttonUrl: "#",
+            userName: userData.name || "",
+            badge: "Alerta de presupuesto",
+          }),
         });
       } catch (error) {
-        console.error(`❌ Error email presupuesto para ${userData.email}:`, error);
+        console.error(
+          `❌ Error email presupuesto para ${userData.email}:`,
+          error,
+        );
       }
     }
   }

@@ -8,6 +8,7 @@ module.exports = ({
   toNumber,
   createInAppNotification,
   sendPushNotificationToUser,
+  buildKyboEmailTemplate,
 }) => {
   const formatCOP = (value) =>
     Number(value || 0).toLocaleString("es-CO", {
@@ -50,7 +51,8 @@ module.exports = ({
     const lastSentAt = doc.data()?.lastSentAt?.toDate?.();
     if (!lastSentAt) return false;
 
-    const diffDays = (Date.now() - lastSentAt.getTime()) / (1000 * 60 * 60 * 24);
+    const diffDays =
+      (Date.now() - lastSentAt.getTime()) / (1000 * 60 * 60 * 24);
 
     return diffDays < days;
   }
@@ -284,20 +286,27 @@ module.exports = ({
             from: `"KYBO App" <${emailUser}>`,
             to: userData.email,
             subject: message.title,
-            html: `
-              <div style="font-family: Arial, sans-serif; color:#333;">
-                <h2 style="color:#2B2257;">${message.title}</h2>
-                <p>Hola ${userData.name || "Usuario"},</p>
+            html: buildKyboEmailTemplate({
+              preheader: message.title,
+              title: message.title,
+              message: `
                 <p>${message.body}</p>
                 <p style="margin-top:16px;">Ingresa a KYBO para revisar tus movimientos y mantener el control.</p>
-              </div>
-            `,
+              `,
+              buttonText: "Revisar mis finanzas",
+              buttonUrl: "#",
+              userName: userData.name || "",
+              badge: "Análisis financiero",
+            }),
           });
 
           await markAutomationSent(uid, emailKey);
           email++;
         } catch (error) {
-          console.error(`❌ Error email automático para ${userData.email}:`, error);
+          console.error(
+            `❌ Error email automático para ${userData.email}:`,
+            error,
+          );
         }
       }
     }
@@ -490,13 +499,18 @@ module.exports = ({
       let email = 0;
 
       for (const [uid, debts] of users.entries()) {
-        const userDoc = await admin.firestore().collection("users").doc(uid).get();
+        const userDoc = await admin
+          .firestore()
+          .collection("users")
+          .doc(uid)
+          .get();
 
         if (!userDoc.exists) continue;
 
         const userData = userDoc.data() || {};
         const role = userData.role || "user";
-        const blocked = userData.isBlocked === true || userData.isActive === false;
+        const blocked =
+          userData.isBlocked === true || userData.isActive === false;
 
         if (role === "admin" || blocked) continue;
 
