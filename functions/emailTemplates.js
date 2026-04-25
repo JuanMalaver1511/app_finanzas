@@ -47,10 +47,10 @@ function buildKyboEmailTemplate({
                 </div>
 
                 <div style="margin:28px 0 24px;">
-                  <a href="${buttonUrl}" 
+                  <a href="${buttonUrl}" target="_blank" rel="noopener noreferrer"
                     style="display:inline-block;background:#FFB84E;color:#2B2257;text-decoration:none;padding:14px 22px;border-radius:14px;font-weight:900;font-size:14px;">
                     ${buttonText}
-                  </a>
+                    </a>
                 </div>
 
                 <div style="background:#F8F7FF;border:1px solid #E7E3FF;border-radius:18px;padding:16px 18px;margin-top:8px;">

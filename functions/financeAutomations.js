@@ -9,6 +9,8 @@ module.exports = ({
   createInAppNotification,
   sendPushNotificationToUser,
   buildKyboEmailTemplate,
+  createNotificationCampaign,
+  buildTrackingUrl,
 }) => {
   const formatCOP = (value) =>
     Number(value || 0).toLocaleString("es-CO", {
@@ -224,7 +226,7 @@ module.exports = ({
     return null;
   }
 
-  async function sendAutomaticFinanceMessage(userDoc, message) {
+  async function sendAutomaticFinanceMessage(userDoc, message, campaignRef) {
     const uid = userDoc.id;
     const userData = userDoc.data() || {};
 
@@ -247,6 +249,7 @@ module.exports = ({
         priority: message.priority,
         source: "finance_auto",
         dedupeKey: appKey,
+        campaignId: campaignRef.id,
       });
 
       await markAutomationSent(uid, appKey);
@@ -294,7 +297,7 @@ module.exports = ({
                 <p style="margin-top:16px;">Ingresa a KYBO para revisar tus movimientos y mantener el control.</p>
               `,
               buttonText: "Revisar mis finanzas",
-              buttonUrl: "#",
+              buttonUrl: `https://trackemailclick-wnfkevrrxa-uc.a.run.app?campaignId=${campaignRef.id}&uid=${uid}&destination=${encodeURIComponent("https://control-financiero-app-b9f91.web.app/#/notifications")}`,
               userName: userData.name || "",
               badge: "Análisis financiero",
             }),
@@ -309,6 +312,14 @@ module.exports = ({
           );
         }
       }
+    }
+
+    if (app > 0 || email > 0) {
+      await campaignRef.update({
+        totalRecipients: admin.firestore.FieldValue.increment(1),
+        appSent: admin.firestore.FieldValue.increment(app),
+        emailSent: admin.firestore.FieldValue.increment(email),
+      });
     }
 
     return { app, push, email };
@@ -332,7 +343,23 @@ module.exports = ({
 
         if (!message) continue;
 
-        const result = await sendAutomaticFinanceMessage(userDoc, message);
+        const campaignRef = await createNotificationCampaign({
+          title: message.title,
+          message: message.body,
+          category: message.type,
+          campaignType: "finance_auto",
+          source: "finance_automation",
+          target: "automatic",
+          sendApp: true,
+          sendEmail: message.sendEmail === true,
+          priority: message.priority,
+        });
+
+        const result = await sendAutomaticFinanceMessage(
+          userDoc,
+          message,
+          campaignRef,
+        );
         app += result.app;
         push += result.push;
         email += result.email;
@@ -371,7 +398,23 @@ module.exports = ({
           emailCooldownDays: 3,
         };
 
-        const result = await sendAutomaticFinanceMessage(userDoc, message);
+        const campaignRef = await createNotificationCampaign({
+          title: message.title,
+          message: message.body,
+          category: message.type,
+          campaignType: "finance_auto",
+          source: "finance_automation",
+          target: "automatic",
+          sendApp: true,
+          sendEmail: message.sendEmail === true,
+          priority: message.priority,
+        });
+
+        const result = await sendAutomaticFinanceMessage(
+          userDoc,
+          message,
+          campaignRef,
+        );
         app += result.app;
         push += result.push;
         email += result.email;
@@ -404,7 +447,23 @@ module.exports = ({
           emailCooldownDays: 7,
         };
 
-        const result = await sendAutomaticFinanceMessage(userDoc, message);
+        const campaignRef = await createNotificationCampaign({
+          title: message.title,
+          message: message.body,
+          category: message.type,
+          campaignType: "finance_auto",
+          source: "finance_automation",
+          target: "automatic",
+          sendApp: true,
+          sendEmail: message.sendEmail === true,
+          priority: message.priority,
+        });
+
+        const result = await sendAutomaticFinanceMessage(
+          userDoc,
+          message,
+          campaignRef,
+        );
         app += result.app;
         push += result.push;
         email += result.email;
@@ -440,7 +499,23 @@ module.exports = ({
           emailCooldownDays: 7,
         };
 
-        const result = await sendAutomaticFinanceMessage(userDoc, message);
+        const campaignRef = await createNotificationCampaign({
+          title: message.title,
+          message: message.body,
+          category: message.type,
+          campaignType: "finance_auto",
+          source: "finance_automation",
+          target: "automatic",
+          sendApp: true,
+          sendEmail: message.sendEmail === true,
+          priority: message.priority,
+        });
+
+        const result = await sendAutomaticFinanceMessage(
+          userDoc,
+          message,
+          campaignRef,
+        );
         app += result.app;
         push += result.push;
         email += result.email;
@@ -528,7 +603,23 @@ module.exports = ({
           emailCooldownDays: 3,
         };
 
-        const result = await sendAutomaticFinanceMessage(userDoc, message);
+        const campaignRef = await createNotificationCampaign({
+          title: message.title,
+          message: message.body,
+          category: message.type,
+          campaignType: "finance_auto",
+          source: "finance_automation",
+          target: "automatic",
+          sendApp: true,
+          sendEmail: message.sendEmail === true,
+          priority: message.priority,
+        });
+
+        const result = await sendAutomaticFinanceMessage(
+          userDoc,
+          message,
+          campaignRef,
+        );
         app += result.app;
         push += result.push;
         email += result.email;

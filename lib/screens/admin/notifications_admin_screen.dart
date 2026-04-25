@@ -34,6 +34,9 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
   String historyPeriod = 'all';
 
   String dashboardPeriod = '30';
+  String dashboardSource = 'all';
+  String historySource = 'all';
+  String historyStatus = 'all';
 
   bool sendApp = true;
   bool sendEmail = false;
@@ -193,6 +196,8 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         'sendEmail': sendEmail,
         'priority': priority,
         'status': 'scheduled',
+        'source': 'admin_panel',
+        'campaignType': 'scheduled',
         'scheduledAt': Timestamp.fromDate(scheduledDateTime!),
         'createdAt': FieldValue.serverTimestamp(),
         'sentAt': null,
@@ -200,6 +205,10 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         'appSent': 0,
         'emailSent': 0,
         'readCount': 0,
+        'emailClickCount': 0,
+        'lastEmailClickAt': null,
+        'uniqueInteractionCount': 0,
+        'lastInteractionAt': null,
       });
 
       if (!mounted) return;
@@ -356,6 +365,13 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         int appSent = 0;
         int emailSent = 0;
         int readCount = 0;
+        int emailClicks = 0;
+        int uniqueInteractions = 0;
+        int manualCampaigns = 0;
+        int automaticCampaigns = 0;
+        int sentCampaigns = 0;
+        int scheduledCampaigns = 0;
+        int failedCampaigns = 0;
 
         final Map<String, int> campaignsByDay = {};
         final List<Map<String, dynamic>> campaignRanking = [];
@@ -367,12 +383,28 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
           final app = _asInt(data['appSent']);
           final email = _asInt(data['emailSent']);
           final reads = _asInt(data['readCount']);
+          final clicks = _asInt(data['emailClickCount']);
+          final realInteractions = _realInteractions(data);
           final createdAt = data['createdAt'];
+          final source = (data['source'] ?? 'admin_panel').toString();
+          final status = (data['status'] ?? 'sent').toString();
+
+          if (_isAutomaticSource(source)) {
+            automaticCampaigns++;
+          } else {
+            manualCampaigns++;
+          }
+
+          if (status == 'sent') sentCampaigns++;
+          if (status == 'scheduled') scheduledCampaigns++;
+          if (status == 'failed') failedCampaigns++;
 
           totalRecipients += recipients;
           appSent += app;
           emailSent += email;
           readCount += reads;
+          emailClicks += clicks;
+          uniqueInteractions += realInteractions;
 
           if (createdAt is Timestamp) {
             final date = createdAt.toDate();
@@ -381,22 +413,33 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
             campaignsByDay[key] = (campaignsByDay[key] ?? 0) + 1;
           }
 
-          final rate = app > 0 ? ((reads / app) * 100).round() : 0;
+          final rate = recipients > 0
+              ? ((realInteractions / recipients) * 100).round()
+              : 0;
 
           campaignRanking.add({
             'title': (data['title'] ?? 'Sin título').toString(),
             'category': (data['category'] ?? 'general').toString(),
-            'readCount': reads,
-            'appSent': app,
+            'interactions': realInteractions,
+            'recipients': recipients,
             'rate': rate,
+            'source': source,
+            'status': status,
           });
         }
 
         campaignRanking
             .sort((a, b) => (b['rate'] as int).compareTo(a['rate'] as int));
 
-        final notRead = (appSent - readCount).clamp(0, appSent);
-        final impact = appSent > 0 ? ((readCount / appSent) * 100).round() : 0;
+        final notRead = (totalRecipients - uniqueInteractions)
+            .clamp(0, totalRecipients)
+            .toInt();
+
+        final impact = totalRecipients > 0
+            ? ((uniqueInteractions / totalRecipients) * 100).round()
+            : 0;
+        final emailCTR =
+            emailSent > 0 ? ((emailClicks / emailSent) * 100).round() : 0;
 
         final isWide = MediaQuery.of(context).size.width >= 950;
 
@@ -407,16 +450,24 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
             children: [
               _dashboardHeader(),
               const SizedBox(height: 16),
-              _dashboardFilter(),
+              _dashboardFilters(),
               const SizedBox(height: 16),
               _dashboardKpis(
                 totalCampaigns: totalCampaigns,
                 totalRecipients: totalRecipients,
                 appSent: appSent,
                 emailSent: emailSent,
+                emailClicks: emailClicks,
                 readCount: readCount,
+                uniqueInteractions: uniqueInteractions,
                 notRead: notRead,
                 impact: impact,
+                emailCTR: emailCTR,
+                manualCampaigns: manualCampaigns,
+                automaticCampaigns: automaticCampaigns,
+                sentCampaigns: sentCampaigns,
+                scheduledCampaigns: scheduledCampaigns,
+                failedCampaigns: failedCampaigns,
               ),
               const SizedBox(height: 18),
               if (isWide)
@@ -424,7 +475,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: _impactDonutChart(readCount, notRead),
+                      child: _impactDonutChart(uniqueInteractions, notRead),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -433,7 +484,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                   ],
                 )
               else ...[
-                _impactDonutChart(readCount, notRead),
+                _impactDonutChart(uniqueInteractions, notRead),
                 const SizedBox(height: 16),
                 _channelsBarChart(appSent, emailSent),
               ],
@@ -471,6 +522,29 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     return docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
       final createdAt = data['createdAt'];
+      final source = (data['source'] ?? 'admin_panel').toString();
+
+      if (dashboardSource != 'all') {
+        if (dashboardSource == 'automatic' && !_isAutomaticSource(source)) {
+          return false;
+        }
+
+        if (dashboardSource == 'manual' && _isAutomaticSource(source)) {
+          return false;
+        }
+
+        if (dashboardSource == 'finance_auto' &&
+            source != 'finance_auto' &&
+            source != 'finance_automation') {
+          return false;
+        }
+
+        if (dashboardSource == 'budget_auto' &&
+            source != 'budget_auto' &&
+            source != 'budget_automation') {
+          return false;
+        }
+      }
 
       if (dashboardPeriod == 'all') return true;
       if (createdAt is! Timestamp) return false;
@@ -526,7 +600,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            "Analiza campañas, lectura en app, canales usados y rendimiento de los mensajes enviados.",
+            "Analiza campañas, interacción real, canales usados y rendimiento de los mensajes enviados.",
             style: TextStyle(
               color: Colors.white70,
               fontSize: 13.5,
@@ -538,15 +612,12 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     );
   }
 
-  Widget _dashboardFilter() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: DropdownButtonFormField<String>(
+  Widget _dashboardFilters() {
+    final isMobile = MediaQuery.of(context).size.width < 720;
+
+    final filters = [
+      DropdownButtonFormField<String>(
+        isExpanded: true,
         value: dashboardPeriod,
         decoration: _inputDecoration("Periodo del dashboard"),
         items: const [
@@ -560,7 +631,55 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
           setState(() => dashboardPeriod = value);
         },
       ),
-    );
+      DropdownButtonFormField<String>(
+        isExpanded: true,
+        value: dashboardSource,
+        decoration: _inputDecoration("Origen"),
+        items: const [
+          DropdownMenuItem(value: 'all', child: Text('Todos')),
+          DropdownMenuItem(value: 'manual', child: Text('Manuales')),
+          DropdownMenuItem(value: 'automatic', child: Text('Automáticas')),
+          DropdownMenuItem(value: 'finance_auto', child: Text('Finanzas auto')),
+          DropdownMenuItem(
+              value: 'budget_auto', child: Text('Presupuesto auto')),
+        ],
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => dashboardSource = value);
+        },
+      ),
+    ];
+
+    return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: isMobile
+            ? Column(
+                children: filters
+                    .map(
+                      (filter) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: filter,
+                      ),
+                    )
+                    .toList(),
+              )
+            : Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: filters
+                    .map(
+                      (filter) => SizedBox(
+                        width: 230,
+                        child: filter,
+                      ),
+                    )
+                    .toList(),
+              ));
   }
 
   Widget _dashboardKpis({
@@ -568,16 +687,42 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     required int totalRecipients,
     required int appSent,
     required int emailSent,
+    required int emailClicks,
     required int readCount,
+    required int uniqueInteractions,
     required int notRead,
     required int impact,
+    required int emailCTR,
+    required int manualCampaigns,
+    required int automaticCampaigns,
+    required int sentCampaigns,
+    required int scheduledCampaigns,
+    required int failedCampaigns,
   }) {
     final cards = [
       _summaryMiniCard(
         icon: Icons.campaign_rounded,
         label: "Campañas",
         value: "$totalCampaigns",
-        subtitle: "en el periodo",
+        subtitle: "$manualCampaigns manuales · $automaticCampaigns auto",
+      ),
+      _summaryMiniCard(
+        icon: Icons.check_circle_rounded,
+        label: "Enviadas",
+        value: "$sentCampaigns",
+        subtitle: "confirmadas",
+      ),
+      _summaryMiniCard(
+        icon: Icons.schedule_rounded,
+        label: "Programadas",
+        value: "$scheduledCampaigns",
+        subtitle: "pendientes",
+      ),
+      _summaryMiniCard(
+        icon: Icons.error_outline_rounded,
+        label: "Fallidas",
+        value: "$failedCampaigns",
+        subtitle: "requieren revisión",
       ),
       _summaryMiniCard(
         icon: Icons.group_rounded,
@@ -598,16 +743,22 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         subtitle: "enviados",
       ),
       _summaryMiniCard(
-        icon: Icons.visibility_rounded,
-        label: "Vistos",
-        value: "$readCount",
-        subtitle: "$impact% lectura",
+        icon: Icons.ads_click_rounded,
+        label: "Clics correo",
+        value: "$emailClicks",
+        subtitle: "$emailCTR% CTR",
+      ),
+      _summaryMiniCard(
+        icon: Icons.how_to_reg_rounded,
+        label: "Interacción real",
+        value: "$uniqueInteractions",
+        subtitle: "$impact% usuarios",
       ),
       _summaryMiniCard(
         icon: Icons.visibility_off_rounded,
-        label: "No vistos",
+        label: "Sin interacción",
         value: "$notRead",
-        subtitle: "pendientes",
+        subtitle: "ni app ni correo",
       ),
     ];
 
@@ -631,7 +782,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         return GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: constraints.maxWidth >= 1200 ? 6 : 3,
+          crossAxisCount: constraints.maxWidth >= 1200 ? 5 : 3,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 2.2,
@@ -687,47 +838,113 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     );
   }
 
-  Widget _impactDonutChart(int readCount, int notRead) {
-    final total = readCount + notRead;
+  Widget _impactDonutChart(int interacted, int notInteracted) {
+    final total = interacted + notInteracted;
 
     return _chartCard(
-      title: "Lectura en app",
-      subtitle: "Comparación entre vistos y no vistos.",
+      title: "Interacción real",
+      subtitle: "Usuarios que interactuaron por app o correo.",
       child: total == 0
-          ? _emptyChart("Aún no hay datos de lectura.")
+          ? _emptyChart("Aún no hay datos de interacción.")
           : SizedBox(
               height: 250,
-              child: PieChart(
-                PieChartData(
-                  sectionsSpace: 3,
-                  centerSpaceRadius: 54,
-                  sections: [
-                    PieChartSectionData(
-                      value: readCount.toDouble(),
-                      color: Colors.green,
-                      title: "Vistos\n$readCount",
-                      radius: 68,
-                      titleStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 3,
+                        centerSpaceRadius: 54,
+                        sections: [
+                          PieChartSectionData(
+                            value: interacted.toDouble(),
+                            color: Colors.green,
+                            title: "$interacted",
+                            radius: 68,
+                            titleStyle: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          PieChartSectionData(
+                            value: notInteracted.toDouble(),
+                            color: Colors.red,
+                            title: "$notInteracted",
+                            radius: 68,
+                            titleStyle: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    PieChartSectionData(
-                      value: notRead.toDouble(),
-                      color: Colors.red,
-                      title: "No vistos\n$notRead",
-                      radius: 68,
-                      titleStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                  ),
+                  const SizedBox(width: 18),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _legendItem(
+                        color: Colors.green,
+                        title: "Interactuaron",
+                        value: interacted,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(height: 14),
+                      _legendItem(
+                        color: Colors.red,
+                        title: "Sin interacción",
+                        value: notInteracted,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
+    );
+  }
+
+  Widget _legendItem({
+    required Color color,
+    required String title,
+    required int value,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "$value",
+              style: const TextStyle(
+                color: _primary,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            Text(
+              title,
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -824,6 +1041,8 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
           LineChartData(
             maxY: maxValue.toDouble() + 1,
             minY: 0,
+            minX: 0,
+            maxX: entries.length == 1 ? 1 : (entries.length - 1).toDouble(),
             gridData: FlGridData(show: true),
             borderData: FlBorderData(show: false),
             titlesData: FlTitlesData(
@@ -840,9 +1059,13 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                 sideTitles: SideTitles(
                   showTitles: true,
                   reservedSize: 32,
+                  interval: 1,
                   getTitlesWidget: (value, meta) {
-                    final index = value.toInt();
-                    if (index < 0 || index >= entries.length) {
+                    final index = value.round();
+
+                    if ((value - index).abs() > 0.01 ||
+                        index < 0 ||
+                        index >= entries.length) {
                       return const SizedBox.shrink();
                     }
 
@@ -887,15 +1110,15 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
 
     return _chartCard(
       title: "Top campañas",
-      subtitle: "Mejor tasa de lectura en app.",
+      subtitle: "Campañas con mayor interacción real.",
       child: top.isEmpty
           ? _emptyChart("No hay campañas para rankear.")
           : Column(
               children: top.map((item) {
                 final title = item['title'].toString();
                 final rate = item['rate'] as int;
-                final reads = item['readCount'] as int;
-                final app = item['appSent'] as int;
+                final interactions = item['interactions'] as int;
+                final recipients = item['recipients'] as int;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -932,7 +1155,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "$rate% lectura · $reads vistos de $app enviados",
+                        "$rate% interacción · $interactions de $recipients destinatarios",
                         style: TextStyle(
                           color: Colors.grey.shade700,
                           fontSize: 11.5,
@@ -1039,6 +1262,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
               ),
               const SizedBox(height: 18),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: selectedCategory,
                 decoration: _inputDecoration("Categoría del mensaje"),
                 items: const [
@@ -1061,6 +1285,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: selectedTarget,
                 decoration: _inputDecoration("Destinatarios"),
                 items: const [
@@ -1096,6 +1321,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
               ],
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
+                isExpanded: true,
                 value: priority,
                 decoration: _inputDecoration("Prioridad"),
                 items: const [
@@ -1538,6 +1764,8 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
       final category = (data['category'] ?? 'general').toString();
       final sendAppValue = data['sendApp'] == true;
       final sendEmailValue = data['sendEmail'] == true;
+      final source = (data['source'] ?? 'admin_panel').toString();
+      final status = (data['status'] ?? 'sent').toString();
       final createdAt = data['createdAt'];
 
       if (search.isNotEmpty &&
@@ -1553,6 +1781,32 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
       if (historyChannel == 'app' && !sendAppValue) return false;
       if (historyChannel == 'email' && !sendEmailValue) return false;
       if (historyChannel == 'both' && (!sendAppValue || !sendEmailValue)) {
+        return false;
+      }
+
+      if (historySource != 'all') {
+        if (historySource == 'manual' && _isAutomaticSource(source)) {
+          return false;
+        }
+
+        if (historySource == 'automatic' && !_isAutomaticSource(source)) {
+          return false;
+        }
+
+        if (historySource == 'finance_auto' &&
+            source != 'finance_auto' &&
+            source != 'finance_automation') {
+          return false;
+        }
+
+        if (historySource == 'budget_auto' &&
+            source != 'budget_auto' &&
+            source != 'budget_automation') {
+          return false;
+        }
+      }
+
+      if (historyStatus != 'all' && status != historyStatus) {
         return false;
       }
 
@@ -1584,6 +1838,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
 
     final filters = [
       DropdownButtonFormField<String>(
+        isExpanded: true,
         value: historyPeriod,
         decoration: _inputDecoration("Fecha"),
         items: const [
@@ -1598,6 +1853,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         },
       ),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         value: historyCategory,
         decoration: _inputDecoration("Categoría"),
         items: const [
@@ -1617,6 +1873,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         },
       ),
       DropdownButtonFormField<String>(
+        isExpanded: true,
         value: historyChannel,
         decoration: _inputDecoration("Canal"),
         items: const [
@@ -1628,6 +1885,39 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         onChanged: (value) {
           if (value == null) return;
           setState(() => historyChannel = value);
+        },
+      ),
+      DropdownButtonFormField<String>(
+        isExpanded: true,
+        value: historySource,
+        decoration: _inputDecoration("Origen"),
+        items: const [
+          DropdownMenuItem(value: 'all', child: Text('Todos')),
+          DropdownMenuItem(value: 'manual', child: Text('Manuales')),
+          DropdownMenuItem(value: 'automatic', child: Text('Automáticas')),
+          DropdownMenuItem(value: 'finance_auto', child: Text('Finanzas auto')),
+          DropdownMenuItem(
+              value: 'budget_auto', child: Text('Presupuesto auto')),
+        ],
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => historySource = value);
+        },
+      ),
+      DropdownButtonFormField<String>(
+        isExpanded: true,
+        value: historyStatus,
+        decoration: _inputDecoration("Estado"),
+        items: const [
+          DropdownMenuItem(value: 'all', child: Text('Todos')),
+          DropdownMenuItem(value: 'scheduled', child: Text('Programadas')),
+          DropdownMenuItem(value: 'sending', child: Text('Enviando')),
+          DropdownMenuItem(value: 'sent', child: Text('Enviadas')),
+          DropdownMenuItem(value: 'failed', child: Text('Fallidas')),
+        ],
+        onChanged: (value) {
+          if (value == null) return;
+          setState(() => historyStatus = value);
         },
       ),
     ];
@@ -1652,7 +1942,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            "Consulta campañas enviadas, filtra por fecha, categoría o canal y revisa los vistos en app.",
+            "Consulta campañas enviadas, filtra por fecha, categoría o canal y revisa interacciones reales.",
             style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
           ),
           const SizedBox(height: 14),
@@ -1677,14 +1967,14 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                   .toList(),
             )
           else
-            Row(
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: filters
                   .map(
-                    (filter) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: filter,
-                      ),
+                    (filter) => SizedBox(
+                      width: 230,
+                      child: filter,
                     ),
                   )
                   .toList(),
@@ -1702,6 +1992,13 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     int appSent = 0;
     int emailSent = 0;
     int readCount = 0;
+    int emailClicks = 0;
+    int uniqueInteractions = 0;
+    int manualCampaigns = 0;
+    int automaticCampaigns = 0;
+    int sentCampaigns = 0;
+    int scheduledCampaigns = 0;
+    int failedCampaigns = 0;
 
     for (final doc in filteredDocs) {
       final data = doc.data() as Map<String, dynamic>;
@@ -1709,10 +2006,30 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
       appSent += _asInt(data['appSent']);
       emailSent += _asInt(data['emailSent']);
       readCount += _asInt(data['readCount']);
+      emailClicks += _asInt(data['emailClickCount']);
+      uniqueInteractions += _realInteractions(data);
+
+      final source = (data['source'] ?? 'admin_panel').toString();
+      final status = (data['status'] ?? 'sent').toString();
+
+      if (_isAutomaticSource(source)) {
+        automaticCampaigns++;
+      } else {
+        manualCampaigns++;
+      }
+
+      if (status == 'sent') sentCampaigns++;
+      if (status == 'scheduled') scheduledCampaigns++;
+      if (status == 'failed') failedCampaigns++;
     }
 
-    final notRead = (appSent - readCount).clamp(0, appSent);
-    final impact = appSent > 0 ? ((readCount / appSent) * 100).round() : 0;
+    final notRead = (totalRecipients - uniqueInteractions)
+        .clamp(0, totalRecipients)
+        .toInt();
+
+    final impact = totalRecipients > 0
+        ? ((uniqueInteractions / totalRecipients) * 100).round()
+        : 0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1723,7 +2040,25 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
             icon: Icons.campaign_rounded,
             label: "Campañas",
             value: "${filteredDocs.length}",
-            subtitle: "de ${allDocs.length} registros",
+            subtitle: "$manualCampaigns manuales · $automaticCampaigns auto",
+          ),
+          _summaryMiniCard(
+            icon: Icons.check_circle_rounded,
+            label: "Enviadas",
+            value: "$sentCampaigns",
+            subtitle: "correctas",
+          ),
+          _summaryMiniCard(
+            icon: Icons.schedule_rounded,
+            label: "Programadas",
+            value: "$scheduledCampaigns",
+            subtitle: "pendientes",
+          ),
+          _summaryMiniCard(
+            icon: Icons.error_outline_rounded,
+            label: "Fallidas",
+            value: "$failedCampaigns",
+            subtitle: "revisar",
           ),
           _summaryMiniCard(
             icon: Icons.group_rounded,
@@ -1735,19 +2070,25 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
             icon: Icons.visibility_rounded,
             label: "Vistos app",
             value: "$readCount",
-            subtitle: "$impact% de lectura",
+            subtitle: "solo lectura en app",
           ),
           _summaryMiniCard(
             icon: Icons.visibility_off_rounded,
-            label: "No vistos",
+            label: "Sin interacción",
             value: "$notRead",
-            subtitle: "pendientes en app",
+            subtitle: "ni app ni correo",
           ),
           _summaryMiniCard(
             icon: Icons.email_rounded,
             label: "Correos",
             value: "$emailSent",
             subtitle: "enviados",
+          ),
+          _summaryMiniCard(
+            icon: Icons.how_to_reg_rounded,
+            label: "Interacción real",
+            value: "$uniqueInteractions",
+            subtitle: "$impact% usuarios",
           ),
         ];
 
@@ -1851,22 +2192,32 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     final message = (data['message'] ?? '').toString();
     final category = (data['category'] ?? 'general').toString();
     final target = (data['target'] ?? 'all').toString();
+    final source = (data['source'] ?? 'admin_panel').toString();
+
+    final status = (data['status'] ?? 'sent').toString();
+    final scheduledAt = data['scheduledAt'];
+    final sentAt = data['sentAt'];
 
     final totalRecipients = _asInt(data['totalRecipients']);
     final appSent = _asInt(data['appSent']);
     final emailSent = _asInt(data['emailSent']);
     final readCount = _asInt(data['readCount']);
-    final notRead = (appSent - readCount).clamp(0, appSent);
-    final impact = appSent > 0 ? ((readCount / appSent) * 100).round() : 0;
+    final emailClickCount = _asInt(data['emailClickCount']);
+    final uniqueInteractionCount = _realInteractions(data);
+
+    final notRead = (totalRecipients - uniqueInteractionCount)
+        .clamp(0, totalRecipients)
+        .toInt();
+
+    final impact = totalRecipients > 0
+        ? ((uniqueInteractionCount / totalRecipients) * 100).round()
+        : 0;
 
     final createdAt = data['createdAt'];
 
-    String dateText = 'Fecha no disponible';
-    if (createdAt is Timestamp) {
-      final date = createdAt.toDate();
-      dateText =
-          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    }
+    final createdText = _formatDateTime(createdAt);
+    final scheduledText = _formatDateTime(scheduledAt);
+    final sentText = _formatDateTime(sentAt);
 
     final impactColor = _impactColor(impact);
 
@@ -1876,7 +2227,7 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
       decoration: BoxDecoration(
         color: _card,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: impactColor.withOpacity(.25)),
+        border: Border.all(color: _statusColor(status).withOpacity(.25)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(.035),
@@ -1895,10 +2246,20 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
+                    _badge(_statusLabel(status), _statusColor(status)),
                     _badge(_categoryLabel(category), _primary),
+                    _badge(_sourceLabel(source), _sourceColor(source)),
                     _badge(_targetLabel(target), Colors.blueGrey),
-                    _badge(dateText, Colors.grey),
-                    _badge("Lectura $impact%", impactColor),
+                    _badge("Creada: $createdText", Colors.grey),
+                    if (status == 'scheduled')
+                      _badge("Programada: $scheduledText", Colors.blue),
+                    if (status == 'sending')
+                      _badge("Procesando envío", Colors.orange),
+                    if (status == 'sent')
+                      _badge("Enviada: $sentText", Colors.green),
+                    if (status == 'failed') _badge("Fallida", Colors.red),
+                    if (status == 'sent')
+                      _badge("Interacción $impact%", impactColor),
                   ],
                 ),
               ),
@@ -1942,8 +2303,16 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
                     Icons.group_rounded, "Destinatarios", "$totalRecipients"),
                 _metric(Icons.notifications_rounded, "App", "$appSent"),
                 _metric(Icons.email_rounded, "Correo", "$emailSent"),
+                _metric(Icons.ads_click_rounded, "Clics correo",
+                    "$emailClickCount"),
+                _metric(
+                  Icons.how_to_reg_rounded,
+                  "Interacciones únicas",
+                  "$uniqueInteractionCount",
+                ),
                 _metric(Icons.visibility_rounded, "Vistos", "$readCount"),
-                _metric(Icons.visibility_off_rounded, "No vistos", "$notRead"),
+                _metric(Icons.visibility_off_rounded, "Sin interacción",
+                    "$notRead"),
               ];
 
               if (isMobile) {
@@ -2217,10 +2586,64 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  int _realInteractions(Map<String, dynamic> data) {
+    final totalRecipients = _asInt(data['totalRecipients']);
+    final unique = _asInt(data['uniqueInteractionCount']);
+
+    // Campañas nuevas: usa el dato real por usuario único.
+    if (unique > 0) {
+      return unique.clamp(0, totalRecipients).toInt();
+    }
+
+    // Campañas antiguas: aproximación con datos disponibles.
+    // Evita que una campaña vieja aparezca en cero si ya tenía app/correo.
+    final appReads = _asInt(data['readCount']);
+    final emailClicks = _asInt(data['emailClickCount']);
+
+    return (appReads + emailClicks).clamp(0, totalRecipients).toInt();
+  }
+
   Color _impactColor(int percent) {
     if (percent >= 70) return Colors.green;
     if (percent >= 35) return Colors.orange;
     return Colors.red;
+  }
+
+  bool _isAutomaticSource(String value) {
+    return value == 'finance_auto' ||
+        value == 'budget_auto' ||
+        value == 'finance_automation' ||
+        value == 'budget_automation';
+  }
+
+  String _sourceLabel(String value) {
+    switch (value) {
+      case 'finance_auto':
+      case 'finance_automation':
+        return 'Finanzas auto';
+      case 'budget_auto':
+      case 'budget_automation':
+        return 'Presupuesto auto';
+      case 'admin_panel':
+        return 'Manual';
+      default:
+        return _isAutomaticSource(value) ? 'Automática' : 'Manual';
+    }
+  }
+
+  Color _sourceColor(String value) {
+    switch (value) {
+      case 'finance_auto':
+      case 'finance_automation':
+        return Colors.indigo;
+      case 'budget_auto':
+      case 'budget_automation':
+        return Colors.deepPurple;
+      case 'admin_panel':
+        return Colors.teal;
+      default:
+        return _isAutomaticSource(value) ? Colors.indigo : Colors.teal;
+    }
   }
 
   String _categoryLabel(String value) {
@@ -2256,6 +2679,54 @@ class _NotificationsAdminScreenState extends State<NotificationsAdminScreen> {
         return 'Usuario específico';
       default:
         return value;
+    }
+  }
+
+  String _formatDateTime(dynamic value) {
+    if (value is! Timestamp) return 'No disponible';
+
+    final date = value.toDate();
+
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year.toString();
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+
+    return '$day/$month/$year · $hour:$minute';
+  }
+
+  String _statusLabel(String value) {
+    switch (value) {
+      case 'scheduled':
+        return 'Programada';
+      case 'sending':
+        return 'Enviando';
+      case 'sent':
+        return 'Enviada';
+      case 'failed':
+        return 'Fallida';
+      case 'cancelled':
+        return 'Cancelada';
+      default:
+        return 'Enviada';
+    }
+  }
+
+  Color _statusColor(String value) {
+    switch (value) {
+      case 'scheduled':
+        return Colors.blue;
+      case 'sending':
+        return Colors.orange;
+      case 'sent':
+        return Colors.green;
+      case 'failed':
+        return Colors.red;
+      case 'cancelled':
+        return Colors.grey;
+      default:
+        return Colors.green;
     }
   }
 }
