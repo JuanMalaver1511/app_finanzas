@@ -690,7 +690,7 @@ class _DashboardInsightCard extends StatelessWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late final TransactionService _txService;
   late final String _uid;
-  late final String _userName;
+  String _userName = 'Usuario';
   late final GoalService _goalService;
 
   @override
@@ -1015,12 +1015,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _HeroBalanceCard(
-                          name: _userName,
-                          balance: balance,
-                          income: income,
-                          expense: expense,
-                          onAdd: _showAddDialog,
+                        StreamBuilder<DocumentSnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(_uid)
+                              .snapshots(),
+                          builder: (context, userSnapshot) {
+                            final data = userSnapshot.data?.data()
+                                as Map<String, dynamic>?;
+
+                            final profileName =
+                                (data?['displayName'] ?? '').toString().trim();
+
+                            final name = profileName.isNotEmpty
+                                ? profileName
+                                : _userName;
+
+                            return _HeroBalanceCard(
+                              name: name,
+                              balance: balance,
+                              income: income,
+                              expense: expense,
+                              onAdd: _showAddDialog,
+                            );
+                          },
                         ),
                         const SizedBox(height: 12),
 
