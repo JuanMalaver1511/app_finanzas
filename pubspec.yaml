@@ -28,6 +28,8 @@ dependencies:
   emoji_picker_flutter: ^1.6.4
   file_picker: ^8.3.2
 
+  shared_preferences: ^2.3.2
+
   flutter_local_notifications: ^18.0.0
   workmanager: ^0.6.0
   http: ^1.2.0

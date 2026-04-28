@@ -14,6 +14,9 @@ import '../notifications/notifications_screen.dart';
 import '../../services/goal_service.dart';
 import '../../models/goal_model.dart';
 import '../../utils/goal_calculator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
+import '../../utils/pwa_install_helper.dart';
 
 // ─── COLORES ───────────────────────────────────────────────────────────────────
 const kPrimary = Color(0xFF6366F1); // azul moderno tipo fintech
@@ -702,8 +705,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _txService = TransactionService(_uid);
     _goalService = GoalService();
 
-    Future.delayed(const Duration(milliseconds: 700), () {
-      _checkIncomeReminder();
+    Future.delayed(const Duration(milliseconds: 900), () async {
+      await _checkIncomeReminder();
+      await _checkInstallReminder();
     });
   }
 
@@ -1082,6 +1086,258 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         },
       ),
+    );
+  }
+
+  Future<void> _checkInstallReminder() async {
+    if (!kIsWeb || !mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    final isInstalled = await isRunningAsInstalledApp();
+
+    if (isInstalled) {
+      await prefs.setBool('kybo_install_done', true);
+      return;
+    }
+
+    final neverShow = prefs.getBool('kybo_install_never_show') ?? false;
+    if (neverShow) return;
+
+    final installed = prefs.getBool('kybo_install_done') ?? false;
+    if (installed) return;
+
+    final nextReminderMillis = prefs.getInt('kybo_install_next_reminder');
+
+    if (nextReminderMillis != null) {
+      final nextReminder =
+          DateTime.fromMillisecondsSinceEpoch(nextReminderMillis);
+
+      if (DateTime.now().isBefore(nextReminder)) return;
+    }
+
+    if (!mounted) return;
+    _showInstallKyboDialog();
+  }
+
+  Future<void> _saveInstallReminderIn5Days() async {
+    final prefs = await SharedPreferences.getInstance();
+    final nextDate = DateTime.now().add(const Duration(days: 5));
+
+    await prefs.setInt(
+      'kybo_install_next_reminder',
+      nextDate.millisecondsSinceEpoch,
+    );
+  }
+
+  Future<void> _markInstallDone() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('kybo_install_done', true);
+  }
+
+  Future<void> _neverShowInstallAgain() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('kybo_install_never_show', true);
+  }
+
+  void _showInstallKyboDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ICONO
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: kPrimary.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.phone_iphone_rounded,
+                    color: kPrimary,
+                    size: 34,
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                // TITULO
+                const Text(
+                  'Usa Kybo como app 📲',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: kDark,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // DESCRIPCIÓN
+                const Text(
+                  'Accede más rápido a tu dinero sin buscar la página en el navegador.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: kGrey,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // BENEFICIO
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FC),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.flash_on_rounded, color: kAmber, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Acceso rápido desde tu pantalla principal',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: kDark,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // BOTÓN PRINCIPAL
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final installed = await promptInstallApp();
+
+                      if (!mounted) return;
+
+                      Navigator.pop(context);
+
+                      if (installed) {
+                        await _markInstallDone();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Kybo se instaló correctamente 📲'),
+                          ),
+                        );
+                      } else {
+                        _showInstallInstructions();
+                      }
+                    },
+                    child: const Text(
+                      'Instalar Kybo',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // ACCIONES SECUNDARIAS
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () async {
+                        await _saveInstallReminderIn5Days();
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'Recordarme después',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await _neverShowInstallAgain();
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'No mostrar',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showInstallInstructions() {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          title: const Text(
+            'Agrega Kybo a tu pantalla',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          content: const Text(
+            'Android:\n'
+            '1. Toca los tres puntos del navegador.\n'
+            '2. Selecciona “Instalar app” o “Agregar a pantalla principal”.\n'
+            '3. Confirma la instalación.\n\n'
+            'iPhone:\n'
+            '1. Abre Kybo desde Safari.\n'
+            '2. Toca el botón de compartir.\n'
+            '3. Selecciona “Agregar a pantalla de inicio”.',
+            style: TextStyle(height: 1.45),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
     );
   }
 }
