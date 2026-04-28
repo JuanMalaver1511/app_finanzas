@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../../services/notification_service.dart';
+import 'dart:async';
 
 const kPrimary = Color(0xFF2B2257);
 const kAccent = Color(0xFFFFB84E);
@@ -50,6 +51,9 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   Map<String, dynamic>? _financeProfile;
 
   String? _expandedCategoryKey;
+  StreamSubscription? _transactionsSub;
+  StreamSubscription? _budgetsSub;
+  Timer? _reloadDebounce;
 
   void _handleBack() {
     final navigator = Navigator.of(context);
@@ -92,13 +96,19 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     super.initState();
     _notificationService = NotificationService(uid);
     _loadData();
+    _startRealtimeListeners();
   }
 
   @override
   void dispose() {
+    _transactionsSub?.cancel();
+    _budgetsSub?.cancel();
+    _reloadDebounce?.cancel();
+
     for (final controller in _controllers.values) {
       controller.dispose();
     }
+
     super.dispose();
   }
 
@@ -161,6 +171,45 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
   bool get _isCurrentMonth {
     final now = DateTime.now();
     return _selectedMonth.year == now.year && _selectedMonth.month == now.month;
+  }
+
+  void _startRealtimeListeners() {
+    _transactionsSub?.cancel();
+    _budgetsSub?.cancel();
+
+    _transactionsSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('transactions')
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(_monthStart))
+        .where('date', isLessThan: Timestamp.fromDate(_monthEnd))
+        .snapshots()
+        .listen((_) {
+      _scheduleRealtimeReload();
+    });
+
+    _budgetsSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('budgets')
+        .doc(_monthKey)
+        .collection('items')
+        .snapshots()
+        .listen((_) {
+      _scheduleRealtimeReload();
+    });
+  }
+
+  void _scheduleRealtimeReload() {
+    if (!mounted || _loading) return;
+
+    _reloadDebounce?.cancel();
+
+    _reloadDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        _loadData(showLoader: false);
+      }
+    });
   }
 
   Future<bool> _ensureMonthBudgetExists() async {
@@ -323,8 +372,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     );
   }
 
-  Future<void> _loadData() async {
-    if (mounted) {
+  Future<void> _loadData({bool showLoader = true}) async {
+    if (mounted && showLoader) {
       setState(() => _loading = true);
     }
 
@@ -616,7 +665,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       debugPrint('Error al cargar presupuestos: $e');
       debugPrintStack(stackTrace: st);
     } finally {
-      if (mounted) {
+      if (mounted && showLoader) {
         setState(() => _loading = false);
       }
     }
@@ -1599,6 +1648,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
       _expandedCategoryKey = null;
       _missingBudgetDialogShown = false;
     });
+
+    _startRealtimeListeners();
     _loadData();
   }
 
@@ -1627,6 +1678,8 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         _expandedCategoryKey = null;
         _missingBudgetDialogShown = false;
       });
+
+      _startRealtimeListeners();
       _loadData();
     }
   }
@@ -2163,7 +2216,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Disponible del presupuesto',
+            'Te queda por gastar según tu presupuesto definido para este mes',
             style: TextStyle(
               color: Colors.white70,
               fontSize: 13,
@@ -2207,7 +2260,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
 
               final items = [
                 _summaryItem(
-                  label: 'Planeado',
+                  label: 'Presupuestado',
                   value: _formatMoney(totalPlanned),
                   icon: Icons.savings_outlined,
                   color: kAccent,
