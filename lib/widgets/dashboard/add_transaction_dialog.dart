@@ -160,7 +160,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   };
 
   final Map<String, String> categoryEmoji = {
-    'Alimentación': '🍔',
+    'Alimentación': '🍽️',
     'Transporte': '🚗',
     'Entretenimiento': '🎬',
     'Salud': '💊',
@@ -172,18 +172,9 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   void _suggestEmoji(String text) {
     if (_emojiManual) return;
 
-    final t = text.toLowerCase();
+    final t = text.toLowerCase().trim();
 
-    // PRIORIDAD 1 → categoría
-    if (_selectedCategory != null &&
-        categoryEmoji.containsKey(_selectedCategory)) {
-      setState(() {
-        _selectedEmoji = categoryEmoji[_selectedCategory]!;
-      });
-      return;
-    }
-
-    // PRIORIDAD 2 → palabras inteligentes
+    // PRIORIDAD 1 → descripción del gasto
     for (final entry in smartMap.entries) {
       for (final word in entry.value) {
         if (t.contains(word)) {
@@ -193,6 +184,15 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
           return;
         }
       }
+    }
+
+    // PRIORIDAD 2 → categoría solo si la descripción no encontró emoji
+    if (_selectedCategory != null &&
+        categoryEmoji.containsKey(_selectedCategory)) {
+      setState(() {
+        _selectedEmoji = categoryEmoji[_selectedCategory]!;
+      });
+      return;
     }
 
     // fallback
