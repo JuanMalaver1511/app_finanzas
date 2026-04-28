@@ -311,28 +311,6 @@ class _DeudasScreenState extends State<DeudasScreen>
     final isWide = _isWide(context);
     return Scaffold(
       backgroundColor: kBg,
-      floatingActionButton: isWide
-          ? null
-          : GestureDetector(
-              onTap: () => _showAddDebt(),
-              child: Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: kAmber,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kDark.withOpacity(0.35),
-                      blurRadius: 14,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.add_rounded,
-                    color: Colors.white, size: 26),
-              ),
-            ),
       body: SafeArea(
         child: Column(
           children: [
@@ -357,6 +335,7 @@ class _DeudasScreenState extends State<DeudasScreen>
   // ─── HEADER ───────────────────────────────────────────────────────────────
   Widget _buildHeader() {
     final isWide = _isWide(context);
+
     return Container(
       color: kBg,
       padding: EdgeInsets.fromLTRB(isWide ? 40 : 20, 16, isWide ? 40 : 20, 8),
@@ -379,8 +358,11 @@ class _DeudasScreenState extends State<DeudasScreen>
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.black12),
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  size: 16, color: kDark),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16,
+                color: kDark,
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -388,13 +370,22 @@ class _DeudasScreenState extends State<DeudasScreen>
             width: 4,
             height: 22,
             decoration: BoxDecoration(
-                color: kAmber, borderRadius: BorderRadius.circular(2)),
+              color: kAmber,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
           const SizedBox(width: 10),
-          const Text('Mis Deudas',
+          const Expanded(
+            child: Text(
+              'Mis Deudas',
               style: TextStyle(
-                  fontWeight: FontWeight.w800, fontSize: 24, color: kDark)),
-          const Spacer(),
+                fontWeight: FontWeight.w800,
+                fontSize: 24,
+                color: kDark,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
           GestureDetector(
             onTap: _showDebtHelpDialog,
             child: Container(
@@ -405,34 +396,46 @@ class _DeudasScreenState extends State<DeudasScreen>
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.black12),
               ),
-              child: const Icon(Icons.help_outline_rounded,
-                  size: 18, color: kDark),
-            ),
-          ),
-          if (isWide) const SizedBox(width: 8),
-          if (isWide)
-            GestureDetector(
-              onTap: () => _showAddDebt(),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                decoration: BoxDecoration(
-                  color: kAmber,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.add_rounded, size: 16, color: Colors.white),
-                    SizedBox(width: 6),
-                    Text('Nueva deuda',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white)),
-                  ],
-                ),
+              child: const Icon(
+                Icons.help_outline_rounded,
+                size: 18,
+                color: kDark,
               ),
             ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () => _showAddDebt(),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isWide ? 18 : 14,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: kAmber,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.add_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isWide ? 'Nueva deuda' : 'Nueva',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
