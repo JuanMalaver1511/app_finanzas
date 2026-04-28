@@ -223,4 +223,100 @@ class NotificationService {
       source: source,
     );
   }
+
+  Future<void> syncBudgetAfterTransaction({
+    required String categoryName,
+    required bool isIncome,
+  }) async {
+    if (isIncome) return;
+
+    final now = DateTime.now();
+    final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final monthStart = DateTime(now.year, now.month);
+    final monthEnd = DateTime(now.year, now.month + 1);
+
+    final categoryKey = categoryName.trim().toLowerCase();
+
+    final budgetSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('budgets')
+        .doc(monthKey)
+        .collection('items')
+        .where('categoryKey', isEqualTo: categoryKey)
+        .limit(1)
+        .get();
+
+    double planned = 0;
+
+    if (budgetSnap.docs.isNotEmpty) {
+      planned =
+          (budgetSnap.docs.first.data()['planned'] as num?)?.toDouble() ?? 0;
+    }
+
+    final txSnap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('transactions')
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+        .where('date', isLessThan: Timestamp.fromDate(monthEnd))
+        .get();
+
+    double spent = 0;
+
+    for (final doc in txSnap.docs) {
+      final data = doc.data();
+      final txIsIncome = data['isIncome'] == true || data['type'] == 'income';
+      if (txIsIncome) continue;
+
+      final rawCategory =
+          (data['categoryName'] ?? data['category'] ?? '').toString().trim();
+
+      if (rawCategory.toLowerCase() == categoryKey) {
+        spent += (data['amount'] as num?)?.toDouble() ?? 0;
+      }
+    }
+
+    final missingKey = 'budget_missing_with_spend_${monthKey}_$categoryKey';
+    final exceededKey = 'budget_exceeded_${monthKey}_$categoryKey';
+    final warningKey = 'budget_warning_${monthKey}_$categoryKey';
+
+    if (spent <= 0) return;
+
+    if (planned <= 0) {
+      await createUnique(
+        dedupeKey: missingKey,
+        title: 'Gastaste sin presupuesto',
+        message:
+            'Ya registraste gastos en $categoryName pero no tienes presupuesto definido.',
+        type: 'budget_missing_with_spend',
+        priority: 'medium',
+        source: 'system',
+      );
+      return;
+    }
+
+    if (spent >= planned) {
+      await createUnique(
+        dedupeKey: exceededKey,
+        title: 'Presupuesto excedido',
+        message: 'Superaste el presupuesto en $categoryName.',
+        type: 'budget_exceeded',
+        priority: 'high',
+        source: 'system',
+      );
+      return;
+    }
+
+    if (spent >= planned * 0.8) {
+      await createUnique(
+        dedupeKey: warningKey,
+        title: 'Estás cerca del límite',
+        message: 'Ya casi alcanzas el presupuesto en $categoryName.',
+        type: 'budget_warning',
+        priority: 'medium',
+        source: 'system',
+      );
+    }
+  }
 }

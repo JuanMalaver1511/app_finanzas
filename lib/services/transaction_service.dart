@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/transaction_model.dart';
+import '../services/notification_service.dart';
 
 class TransactionService {
   final String uid;
@@ -16,13 +17,23 @@ class TransactionService {
       .snapshots()
       .map((s) => s.docs.map(AppTransaction.fromDoc).toList());
 
-  Future<void> add(AppTransaction tx) => _col.add(tx.toMap());
+  Future<void> add(AppTransaction tx) async {
+    await _col.add(tx.toMap());
+
+    // 🔥 DISPARAR NOTIFICACIONES EN TIEMPO REAL
+    final notificationService = NotificationService(uid);
+
+    await notificationService.syncBudgetAfterTransaction(
+      categoryName: tx.category,
+      isIncome: tx.isIncome,
+    );
+  }
 
   Future<void> delete(String id) => _col.doc(id).delete();
 
   Future<void> update(AppTransaction tx) => _col.doc(tx.id).update(tx.toMap());
 
-  // 🔥 RESUMEN GENERAL (ROBUSTO)
+  // RESUMEN GENERAL (ROBUSTO)
   Future<Map<String, dynamic>> getResumenMensual() async {
     final snapshot = await _col.get();
 
@@ -34,7 +45,7 @@ class TransactionService {
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
 
-      // 🔥 AMOUNT
+      // AMOUNT
       double amount = 0;
       final rawAmount = data['amount'];
 
@@ -44,10 +55,10 @@ class TransactionService {
         amount = rawAmount;
       }
 
-      // 🔥 isIncome
+      // isIncome
       final isIncome = data['isIncome'];
 
-      // 🔥 FECHA (CLAVE)
+      // FECHA (CLAVE)
       DateTime? date;
       if (data['date'] is Timestamp) {
         date = (data['date'] as Timestamp).toDate();
@@ -55,7 +66,7 @@ class TransactionService {
 
       if (date == null) continue;
 
-      // ✅ FILTRO POR MES ACTUAL
+      // FILTRO POR MES ACTUAL
       if (date.month == now.month && date.year == now.year) {
         if (isIncome == true) {
           ingresos += amount;

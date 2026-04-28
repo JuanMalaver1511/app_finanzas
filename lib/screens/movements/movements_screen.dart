@@ -195,23 +195,6 @@ class _MovementsScreenState extends State<MovementsScreen>
       value: SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: kBg,
-        floatingActionButton: Padding(
-          padding: const EdgeInsets.only(bottom: 1, right: 1),
-          child: FloatingActionButton(
-            onPressed: _openAddTransaction,
-            backgroundColor: kAmber,
-            elevation: 6,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(
-              Icons.add,
-              size: 26,
-              color: Colors.white,
-            ),
-          ),
-        ),
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         body: SafeArea(
           child: FadeTransition(
             opacity: _fadeAnim,
@@ -221,24 +204,10 @@ class _MovementsScreenState extends State<MovementsScreen>
                 final isDesktop = constraints.maxWidth >= 1024;
 
                 if (isDesktop) {
-                  // Para desktop, ocupar todo el ancho con márgenes
                   return _buildDesktopLayout();
-                } else {
-                  // Para móvil y tablet, centrar con ancho máximo
-                  double maxWidth;
-                  if (isMobile) {
-                    maxWidth = constraints.maxWidth;
-                  } else {
-                    maxWidth = 900;
-                  }
-
-                  return Center(
-                    child: SizedBox(
-                      width: maxWidth,
-                      child: _buildMobileLayout(isMobile),
-                    ),
-                  );
                 }
+
+                return _buildMobileLayout(isMobile);
               },
             ),
           ),
@@ -274,7 +243,14 @@ class _MovementsScreenState extends State<MovementsScreen>
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildSummaryCards(income, expense, isMobile),
+                      _buildHeroCard(income, expense, isMobile),
+                      const SizedBox(height: 14),
+                      _buildSummaryCards(income, expense, isMobile, list),
+                      const SizedBox(height: 14),
+                      _movementInsightStrip(
+                        expense: expense,
+                        transactions: list,
+                      ),
                       const SizedBox(height: 20),
                       _buildChartSection(),
                       const SizedBox(height: 20),
@@ -291,6 +267,256 @@ class _MovementsScreenState extends State<MovementsScreen>
         ),
       ],
     );
+  }
+
+  Widget _movementInsightStrip({
+    required double expense,
+    required List<AppTransaction> transactions,
+  }) {
+    final topCategory = _topExpenseCategory(transactions);
+
+    final avgDailyExpense = _averageDailyExpense(expense);
+    final projectedExpense = _projectedMonthExpense(expense);
+    final mostExpensiveDay = _mostExpensiveDay(transactions);
+
+    return FutureBuilder<double>(
+      future: _previousMonthExpenseTotal(),
+      builder: (context, snapshot) {
+        final previousExpense = snapshot.data ?? 0;
+
+        String comparisonText = 'Sin comparación del mes anterior';
+        Color comparisonColor = kGrey;
+        IconData comparisonIcon = Icons.remove_rounded;
+
+        if (previousExpense > 0) {
+          final diffPercent =
+              ((expense - previousExpense) / previousExpense) * 100;
+          final isHigher = diffPercent > 0;
+
+          comparisonText =
+              '${isHigher ? '+' : ''}${diffPercent.toStringAsFixed(0)}% vs mes pasado';
+          comparisonColor = isHigher ? kRed : kGreen;
+          comparisonIcon = isHigher
+              ? Icons.trending_up_rounded
+              : Icons.trending_down_rounded;
+        }
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: _cardDecoration(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Análisis inteligente',
+                style: TextStyle(
+                  color: kDark,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Lectura rápida de tus gastos del mes.',
+                style: TextStyle(
+                  color: kGrey,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _insightBadge(
+                    icon: comparisonIcon,
+                    text: comparisonText,
+                    color: comparisonColor,
+                  ),
+                  if (topCategory != null)
+                    _insightBadge(
+                      icon: Icons.category_rounded,
+                      text: 'Mayor gasto: $topCategory',
+                      color: kAmber,
+                    ),
+                  if (expense > 0)
+                    _insightBadge(
+                      icon: Icons.calendar_today_rounded,
+                      text: 'Promedio diario: ${_formatCOP(avgDailyExpense)}',
+                      color: kDark,
+                    ),
+                  if (projectedExpense > expense)
+                    _insightBadge(
+                      icon: Icons.insights_rounded,
+                      text: 'Proyección: ${_formatCOP(projectedExpense)}',
+                      color: projectedExpense > expense * 1.25 ? kRed : kAmber,
+                    ),
+                  if (mostExpensiveDay != null)
+                    _insightBadge(
+                      icon: Icons.local_fire_department_rounded,
+                      text: 'Día más alto: $mostExpensiveDay',
+                      color: kRed,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _insightBadge({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    Color bgColor;
+    Color borderColor;
+    Color textColor;
+
+    if (color == kRed) {
+      bgColor = const Color(0xFFFFE3E0);
+      borderColor = const Color(0xFFFF8A80);
+      textColor = const Color(0xFFC62828);
+    } else if (color == kAmber) {
+      bgColor = const Color(0xFFFFE6B8);
+      borderColor = const Color(0xFFFFB84E);
+      textColor = const Color(0xFF8A4F00);
+    } else if (color == kGreen) {
+      bgColor = const Color(0xFFDDF7E8);
+      borderColor = const Color(0xFF7ED9A5);
+      textColor = const Color(0xFF145C35);
+    } else {
+      bgColor = const Color(0xFFE9ECF2);
+      borderColor = const Color(0xFFC8CED8);
+      textColor = const Color(0xFF2B2F3A);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor, width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: textColor),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _topExpenseCategory(List<AppTransaction> transactions) {
+    final totals = <String, double>{};
+
+    for (final tx in transactions) {
+      if (tx.isIncome) continue;
+
+      final category =
+          tx.category.trim().isEmpty ? 'Otros' : tx.category.trim();
+
+      totals[category] = (totals[category] ?? 0) + tx.amount;
+    }
+
+    if (totals.isEmpty) return null;
+
+    final sorted = totals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return sorted.first.key;
+  }
+
+  double _averageDailyExpense(double expense) {
+    final totalDays = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month + 1,
+      0,
+    ).day;
+
+    if (totalDays == 0) return 0;
+    return expense / totalDays;
+  }
+
+  double _projectedMonthExpense(double expense) {
+    final now = DateTime.now();
+
+    final isCurrentMonth =
+        _selectedMonth.year == now.year && _selectedMonth.month == now.month;
+
+    if (!isCurrentMonth || expense <= 0) return expense;
+
+    final currentDay = now.day;
+    final totalDays = DateTime(now.year, now.month + 1, 0).day;
+
+    return (expense / currentDay) * totalDays;
+  }
+
+  String? _mostExpensiveDay(List<AppTransaction> transactions) {
+    final totals = <String, double>{};
+
+    for (final tx in transactions) {
+      if (tx.isIncome) continue;
+
+      final label = '${tx.date.day} de ${_monthName(tx.date.month)}';
+      totals[label] = (totals[label] ?? 0) + tx.amount;
+    }
+
+    if (totals.isEmpty) return null;
+
+    final sorted = totals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return sorted.first.key;
+  }
+
+  AppTransaction? _highestTransaction(List<AppTransaction> list) {
+    final expenses = list.where((t) => !t.isIncome).toList();
+
+    if (expenses.isEmpty) return null;
+
+    expenses.sort((a, b) => b.amount.compareTo(a.amount));
+
+    return expenses.first;
+  }
+
+  Future<double> _previousMonthExpenseTotal() async {
+    final previousMonth = DateTime(
+      _selectedMonth.year,
+      _selectedMonth.month - 1,
+    );
+
+    final start = DateTime(previousMonth.year, previousMonth.month);
+    final end = DateTime(previousMonth.year, previousMonth.month + 1);
+
+    final snap = await _col
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
+        .get();
+
+    double total = 0;
+
+    for (final doc in snap.docs) {
+      final tx = AppTransaction.fromDoc(doc);
+      if (!tx.isIncome) {
+        total += tx.amount;
+      }
+    }
+
+    return total;
   }
 
   Widget _buildDesktopLayout() {
@@ -311,9 +537,7 @@ class _MovementsScreenState extends State<MovementsScreen>
 
               return LayoutBuilder(
                 builder: (context, constraints) {
-                  final horizontalPadding = constraints.maxWidth > 1400
-                      ? (constraints.maxWidth - 1400) / 2 + 32
-                      : 32.0;
+                  const horizontalPadding = 20.0;
 
                   return Padding(
                     padding: EdgeInsets.fromLTRB(
@@ -328,7 +552,15 @@ class _MovementsScreenState extends State<MovementsScreen>
                               children: [
                                 _buildMonthSelector(),
                                 const SizedBox(height: 16),
-                                _buildSummaryCards(income, expense, false),
+                                _buildHeroCard(income, expense, false),
+                                const SizedBox(height: 14),
+                                _buildSummaryCards(
+                                    income, expense, false, list),
+                                const SizedBox(height: 14),
+                                _movementInsightStrip(
+                                  expense: expense,
+                                  transactions: list,
+                                ),
                                 const SizedBox(height: 20),
                                 _buildChartSection(),
                                 const SizedBox(height: 90),
@@ -371,106 +603,106 @@ class _MovementsScreenState extends State<MovementsScreen>
     );
   }
 
-  Widget _buildDesktopHeader() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final horizontalPadding = constraints.maxWidth > 1400
-            ? (constraints.maxWidth - 1400) / 2 + 32
-            : 32.0;
-
-        return Container(
-          color: kBg,
-          padding:
-              EdgeInsets.fromLTRB(horizontalPadding, 16, horizontalPadding, 12),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  Navigator.pushNamed(context, '/');
-                },
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: kCard,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: kDark.withOpacity(0.06),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: kDark,
-                    size: 18,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Container(
-                width: 7,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: kAmber,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Mis Movimientos',
-                style: TextStyle(
-                  color: kDark,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 22,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+  Widget _headerIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: kDark.withOpacity(0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: kDark, size: 20),
+      ),
     );
   }
 
-  Widget _buildAppBar(bool isMobile) {
-    return SliverAppBar(
-      backgroundColor: kBg,
-      elevation: 0,
-      pinned: true,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: GestureDetector(
-          onTap: () {
-            Navigator.pushNamed(context, '/');
-          },
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: kCard,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: kDark.withOpacity(0.05),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+  Widget _headerActionButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: kAmber,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: kAmber.withOpacity(0.28),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
-            child: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: kDark,
-              size: 16,
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
             ),
-          ),
+          ],
         ),
       ),
-      title: Row(
+    );
+  }
+
+  Widget _buildDesktopHeader() {
+    return Container(
+      color: kBg,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      child: Row(
         children: [
+          InkWell(
+            onTap: () => Navigator.pushNamed(context, '/'),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: kCard,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: kDark.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: kDark,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           Container(
-            width: 7,
+            width: 5,
             height: 22,
             decoration: BoxDecoration(
               color: kAmber,
@@ -478,13 +710,127 @@ class _MovementsScreenState extends State<MovementsScreen>
             ),
           ),
           const SizedBox(width: 10),
-          const Text(
-            'Mis Movimientos',
-            style: TextStyle(
-              color: kDark,
-              fontWeight: FontWeight.w800,
-              fontSize: 21,
-              letterSpacing: -0.5,
+          const Expanded(
+            child: Text(
+              'Mis movimientos',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: kDark,
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+              ),
+            ),
+          ),
+          _headerIconButton(
+            icon: Icons.help_outline_rounded,
+            onTap: _showHelpDialog,
+          ),
+          const SizedBox(width: 10),
+          _headerActionButton(
+            label: 'Nueva transacción',
+            icon: Icons.add_rounded,
+            onTap: _openAddTransaction,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppBar(bool isMobile) {
+    return SliverAppBar(
+      backgroundColor: kBg,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      pinned: true,
+      automaticallyImplyLeading: false,
+      toolbarHeight: isMobile ? 72 : 78,
+      titleSpacing: isMobile ? 14 : 20,
+      title: Row(
+        children: [
+          InkWell(
+            onTap: () => Navigator.pushNamed(context, '/'),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: kCard,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: kDark.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: kDark,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 5,
+            height: 22,
+            decoration: BoxDecoration(
+              color: kAmber,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Mis movimientos',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: kDark,
+                fontWeight: FontWeight.w800,
+                fontSize: isMobile ? 17 : 22,
+              ),
+            ),
+          ),
+          _headerIconButton(
+            icon: Icons.help_outline_rounded,
+            onTap: _showHelpDialog,
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: _openAddTransaction,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              decoration: BoxDecoration(
+                color: kAmber,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: kAmber.withOpacity(0.28),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    "Nueva",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -564,111 +910,126 @@ class _MovementsScreenState extends State<MovementsScreen>
     );
   }
 
-  Widget _buildSummaryCards(double income, double expense, bool isMobile) {
+  Widget _buildHeroCard(double income, double expense, bool isMobile) {
     final balance = income - expense;
 
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: kDark.withOpacity(0.25),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: kDark.withOpacity(0.25),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Balance del mes',
+            style: TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatCOP(balance.abs()),
+                style: TextStyle(
+                  color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
+                  fontSize: isMobile ? 30 : 36,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                balance >= 0
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
+                size: 20,
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 6),
+          Text(
+            balance >= 0 ? 'Vas bien 👍' : 'Revisa tus gastos',
+            style: TextStyle(
+              color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCards(
+    double income,
+    double expense,
+    bool isMobile,
+    List<AppTransaction> transactions,
+  ) {
+    final balance = income - expense;
+
+    final statusColor = balance >= 0 ? kGreen : kRed;
+    final statusTitle = balance >= 0 ? 'Balance positivo' : 'Balance negativo';
+    final statusMessage = balance >= 0
+        ? 'Tus ingresos cubren tus gastos este mes.'
+        : 'Tus gastos superan tus ingresos registrados.';
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Balance del mes',
-                    style: TextStyle(color: Colors.white60, fontSize: 13),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: kAmber.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: kAmber.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      '${_monthShort(_selectedMonth.month)} ${_selectedMonth.year}',
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  balance >= 0
+                      ? Icons.trending_up_rounded
+                      : Icons.trending_down_rounded,
+                  color: statusColor,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      statusTitle,
                       style: const TextStyle(
-                        color: kAmber,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        color: kDark,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _formatCOP(balance.abs()),
-                    style: TextStyle(
-                      color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
-                      fontSize: isMobile ? 30 : 36,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(
-                    balance >= 0
-                        ? Icons.trending_up_rounded
-                        : Icons.trending_down_rounded,
-                    color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
-                    size: 20,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: (balance >= 0 ? const Color(0xFF56E39F) : kRed)
-                      .withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: (balance >= 0 ? const Color(0xFF56E39F) : kRed)
-                        .withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      balance >= 0
-                          ? Icons.arrow_upward_rounded
-                          : Icons.arrow_downward_rounded,
-                      color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      balance >= 0 ? 'Balance positivo' : 'Balance negativo',
-                      style: TextStyle(
-                        color: balance >= 0 ? const Color(0xFF56E39F) : kRed,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                      statusMessage,
+                      style: const TextStyle(
+                        color: kGrey,
+                        fontSize: 12.5,
+                        height: 1.3,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -676,29 +1037,220 @@ class _MovementsScreenState extends State<MovementsScreen>
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 12),
-        if (isMobile) ...[
-          _miniCard('Ingresos', income, kGreen, Icons.south_rounded),
-          const SizedBox(height: 12),
-          _miniCard('Gastos', expense, kRed, Icons.north_rounded),
-        ] else ...[
-          Row(
-            children: [
-              Expanded(
-                child:
-                    _miniCard('Ingresos', income, kGreen, Icons.south_rounded),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _miniCard('Gastos', expense, kRed, Icons.north_rounded),
-              ),
-            ],
-          ),
+          const SizedBox(height: 14),
+          _buildFinancialHealthCard(income, expense),
+          const SizedBox(height: 16),
+          if (isMobile) ...[
+            _movementMetricCard(
+              title: 'Ingresos',
+              value: _formatCOP(income),
+              icon: Icons.south_rounded,
+              color: kGreen,
+            ),
+            const SizedBox(height: 10),
+            _movementMetricCard(
+              title: 'Gastos',
+              value: _formatCOP(expense),
+              icon: Icons.north_rounded,
+              color: kRed,
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _movementMetricCard(
+                    title: 'Ingresos',
+                    value: _formatCOP(income),
+                    icon: Icons.south_rounded,
+                    color: kGreen,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _movementMetricCard(
+                    title: 'Gastos',
+                    value: _formatCOP(expense),
+                    icon: Icons.north_rounded,
+                    color: kRed,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
+
+  Widget _buildFinancialHealthCard(double income, double expense) {
+    final score = _financialHealthScore(income, expense);
+
+    Color color;
+    String title;
+    String message;
+
+    if (score >= 80) {
+      color = kGreen;
+      title = 'Salud financiera alta';
+      message = 'Buen control este mes. Estás gastando con equilibrio.';
+    } else if (score >= 55) {
+      color = kAmber;
+      title = 'Salud financiera media';
+      message = 'Vas bien, pero puedes cuidar un poco más tus gastos.';
+    } else {
+      color = kRed;
+      title = 'Salud financiera baja';
+      message = 'Tus gastos están muy cerca o por encima de tus ingresos.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.16)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 54,
+            height: 54,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: score / 100,
+                  strokeWidth: 6,
+                  backgroundColor: color.withOpacity(0.14),
+                  color: color,
+                ),
+                Text(
+                  '$score',
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: kDark,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: kGrey,
+                    fontSize: 12,
+                    height: 1.3,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _financialHealthScore(double income, double expense) {
+    if (income <= 0 && expense <= 0) return 0;
+    if (income <= 0 && expense > 0) return 20;
+
+    final balance = income - expense;
+    final savingRate = balance / income;
+
+    if (savingRate >= 0.35) return 95;
+    if (savingRate >= 0.25) return 88;
+    if (savingRate >= 0.15) return 78;
+    if (savingRate >= 0.05) return 65;
+    if (savingRate >= 0) return 55;
+    if (savingRate >= -0.10) return 38;
+
+    return 20;
+  }
+
+  Widget _movementMetricCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.12)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: kGrey,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() => BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.045),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      );
 
   Widget _miniCard(String title, double value, Color color, IconData icon) {
     return Container(
@@ -1054,6 +1606,8 @@ class _MovementsScreenState extends State<MovementsScreen>
       grouped.putIfAbsent(_dateLabel(t.date), () => []).add(t);
     }
 
+    final highestTransaction = _highestTransaction(list);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: grouped.entries.map((e) {
@@ -1095,7 +1649,13 @@ class _MovementsScreenState extends State<MovementsScreen>
               const SizedBox(height: 10),
               if (gastos.isNotEmpty) ...[
                 _sectionHeader('Gastos', kRed, totalGastos),
-                ...gastos.map((t) => _transactionTile(t)),
+                ...gastos.map(
+                  (t) => _transactionTile(
+                    t,
+                    isTop: highestTransaction != null &&
+                        t.id == highestTransaction.id,
+                  ),
+                ),
               ],
               if (gastos.isNotEmpty && ingresos.isNotEmpty)
                 const SizedBox(height: 10),
@@ -1146,7 +1706,7 @@ class _MovementsScreenState extends State<MovementsScreen>
     );
   }
 
-  Widget _transactionTile(AppTransaction t) {
+  Widget _transactionTile(AppTransaction t, {bool isTop = false}) {
     final color = t.isIncome ? kGreen : kRed;
     final softColor = color.withOpacity(0.08);
 
@@ -1155,7 +1715,10 @@ class _MovementsScreenState extends State<MovementsScreen>
       decoration: BoxDecoration(
         color: kCard,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: kBg),
+        border: Border.all(
+          color: isTop ? kAmber : kBg,
+          width: isTop ? 1.6 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: kDark.withOpacity(0.04),
@@ -1228,6 +1791,26 @@ class _MovementsScreenState extends State<MovementsScreen>
                           ),
                         ],
                       ),
+                      if (isTop)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: kAmber.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Gasto más alto',
+                              style: TextStyle(
+                                color: kAmber,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -1424,6 +2007,171 @@ class _MovementsScreenState extends State<MovementsScreen>
 
     if (!mounted) return;
     await _loadCategories();
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 520),
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: kCard,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: kAmber.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.receipt_long_rounded,
+                        color: kAmber,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Guía rápida de movimientos',
+                        style: TextStyle(
+                          color: kDark,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _helpItem(
+                  icon: Icons.add_circle_outline_rounded,
+                  title: '1. Registra ingresos y gastos',
+                  description:
+                      'Usa el botón Nueva para guardar cada movimiento y mantener tu balance actualizado.',
+                ),
+                _helpItem(
+                  icon: Icons.filter_alt_outlined,
+                  title: '2. Filtra tus movimientos',
+                  description:
+                      'Puedes revisar todos, solo gastos, solo ingresos o una categoría específica.',
+                ),
+                _helpItem(
+                  icon: Icons.insights_rounded,
+                  title: '3. Revisa el análisis inteligente',
+                  description:
+                      'Kybo te muestra tu mayor gasto, promedio diario, proyección mensual y el día con más gastos.',
+                ),
+                _helpItem(
+                  icon: Icons.star_border_rounded,
+                  title: '4. Identifica tu gasto más alto',
+                  description:
+                      'El movimiento más fuerte del mes se marca para que sepas dónde poner atención.',
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: kAmber.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    '💡 Tip: registra tus movimientos el mismo día para que las proyecciones sean más precisas.',
+                    style: TextStyle(
+                      color: kDark,
+                      fontSize: 13,
+                      height: 1.4,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kAmber,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Entendido',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _helpItem({
+    required IconData icon,
+    required String title,
+    required String description,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: kDark, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: kDark,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    color: kGrey,
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatCOP(double value) {

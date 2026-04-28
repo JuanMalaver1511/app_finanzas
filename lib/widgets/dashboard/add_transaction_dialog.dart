@@ -102,33 +102,61 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     });
   }
 
-  final Map<String, String> keywordEmoji = {
-    'pizza': '🍕',
-    'hamburguesa': '🍔',
-    'comida': '🍔',
-    'restaurante': '🍽️',
-    'cafe': '☕',
-    'desayuno': '🥐',
-    'uber': '🚗',
-    'taxi': '🚗',
-    'bus': '🚌',
-    'gasolina': '⛽',
-    'netflix': '🎬',
-    'cine': '🎬',
-    'spotify': '🎧',
-    'musica': '🎧',
-    'medico': '💊',
-    'farmacia': '💊',
-    'hospital': '🏥',
-    'ropa': '🛍️',
-    'zapatos': '👟',
-    'arriendo': '🏠',
-    'casa': '🏠',
-    'luz': '💡',
-    'agua': '🚿',
-    'salario': '💰',
-    'trabajo': '💼',
-    'pago': '💰',
+  final Map<String, List<String>> smartMap = {
+    '🛒': ['mercado', 'supermercado', 'compras', 'tienda'],
+    '🍽️': ['comida', 'almuerzo', 'cena', 'restaurante'],
+    '🍕': ['pizza'],
+    '🍔': ['hamburguesa'],
+    '☕': ['cafe', 'café', 'desayuno'],
+    '🚗': ['uber', 'taxi', 'carro'],
+    '🚌': ['bus', 'transporte'],
+    '⛽': ['gasolina'],
+    '🎬': [
+      'cine',
+      'netflix',
+      'hbo',
+      'disney',
+      'prime',
+      'amazon prime',
+      'paramount'
+    ],
+    '🎧': [
+      'spotify',
+      'apple music',
+      'youtube music',
+      'deezer',
+      'tidal',
+      'soundcloud'
+    ],
+    '✈️': ['viaje', 'vuelo', 'avion', 'pasaje', 'aeropuerto'],
+    '🏨': ['hotel', 'hospedaje', 'airbnb', 'reserva', 'booking'],
+    '🧾': ['servicios', 'factura', 'recibo', 'pago servicios', 'cuenta'],
+    '📶': [
+      'internet',
+      'wifi',
+      'datos',
+      'plan',
+      'movil',
+      'celular',
+      'recarga',
+      'claro',
+      'movistar',
+      'tigo'
+    ],
+    '🛵': ['rappi', 'didi food', 'uber eats', 'domicilio', 'pedido'],
+    '📚': ['universidad', 'colegio', 'curso', 'matricula', 'matrícula'],
+    '🔥': ['gas', 'gas natural', 'cilindro'],
+    '💊': ['medico', 'farmacia'],
+    '🏥': ['hospital'],
+    '🛍️': ['ropa', 'compras ropa'],
+    '👟': ['zapatos'],
+    '🏠': ['arriendo', 'casa', 'hogar'],
+    '💡': ['luz'],
+    '🚿': ['agua'],
+    '💼': ['trabajo'],
+    '💰': ['salario', 'ingreso', 'pago'],
+    '🎁': ['regalo', 'cumpleaños', 'detalle'],
+    '⚽': ['gym', 'gimnasio', 'deporte', 'futbol', 'fútbol'],
   };
 
   final Map<String, String> categoryEmoji = {
@@ -146,15 +174,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
     final t = text.toLowerCase();
 
-    for (final key in keywordEmoji.keys) {
-      if (t.contains(key)) {
-        setState(() {
-          _selectedEmoji = keywordEmoji[key]!;
-        });
-        return;
-      }
-    }
-
+    // PRIORIDAD 1 → categoría
     if (_selectedCategory != null &&
         categoryEmoji.containsKey(_selectedCategory)) {
       setState(() {
@@ -163,6 +183,19 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       return;
     }
 
+    // PRIORIDAD 2 → palabras inteligentes
+    for (final entry in smartMap.entries) {
+      for (final word in entry.value) {
+        if (t.contains(word)) {
+          setState(() {
+            _selectedEmoji = entry.key;
+          });
+          return;
+        }
+      }
+    }
+
+    // fallback
     setState(() {
       _selectedEmoji = _isIncome ? '💰' : '💸';
     });
@@ -425,12 +458,15 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
   }
 
   String _formatPreviewAmount() {
-    final amount = double.tryParse(_amountCtrl.text.replaceAll(',', '.')) ?? 0;
+    final clean = _amountCtrl.text.replaceAll('.', '').replaceAll(',', '');
+    final amount = double.tryParse(clean) ?? 0;
+
     final formatter = NumberFormat.currency(
       locale: 'es_CO',
       symbol: 'COP ',
       decimalDigits: 0,
     );
+
     return formatter.format(amount);
   }
 
@@ -990,10 +1026,13 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                     ],
-                    onChanged: _formatAmount,
+                    onChanged: (value) {
+                      _formatAmount(value);
+                      setState(() {});
+                    },
                     decoration: const InputDecoration(
                       border: InputBorder.none,
-                      hintText: "Ej: 120000",
+                      hintText: "Ej: 120.000",
                       labelText: "Monto",
                       prefixIcon: Icon(Icons.attach_money_rounded),
                     ),

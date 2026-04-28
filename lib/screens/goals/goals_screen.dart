@@ -30,6 +30,14 @@ class GoalsScreen extends StatefulWidget {
 }
 
 class _GoalsScreenState extends State<GoalsScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   final GoalService _goalService = GoalService();
 
   String _formatCurrency(double value) {
@@ -92,9 +100,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
   Future<void> _openEditGoal(GoalModel goal) async {
     final updated = await Navigator.push<bool>(
       context,
-      _buildAnimatedRoute<bool>(
-        CreateGoalScreen(goal: goal)
-      ),
+      _buildAnimatedRoute<bool>(CreateGoalScreen(goal: goal)),
     );
 
     if (!mounted) return;
@@ -320,7 +326,7 @@ class _GoalsScreenState extends State<GoalsScreen> {
               ),
             ),
           ),
-          if (!isMobile) ...[
+          ...[
             const SizedBox(width: 12),
             SizedBox(
               height: 46,
@@ -336,9 +342,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
                   ),
                 ),
                 icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text(
-                  'Nueva meta',
-                  style: TextStyle(
+                label: Text(
+                  isMobile ? 'Nueva' : 'Nueva meta',
+                  style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 14,
                   ),
@@ -532,27 +538,9 @@ class _GoalsScreenState extends State<GoalsScreen> {
                     height: 1.35,
                   ),
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 42,
-                  child: ElevatedButton(
-                    onPressed: _openCreateGoal,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kDark,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Crear mi primera meta',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
+                if (!isMobile) ...[
+                  const SizedBox(height: 12),
+                ],
               ],
             ),
           ),
@@ -729,8 +717,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
         final goals = snapshot.data ?? [];
 
         return Scrollbar(
+          controller: _scrollController,
           thumbVisibility: !isMobile,
           child: SingleChildScrollView(
+            controller: _scrollController,
             physics: const BouncingScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
               isMobile ? 16 : 28,
@@ -767,19 +757,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      floatingActionButton: isMobile
-          ? FloatingActionButton.extended(
-              onPressed: _openCreateGoal,
-              backgroundColor: kDark,
-              foregroundColor: Colors.white,
-              elevation: 2,
-              icon: const Icon(Icons.add_rounded),
-              label: const Text(
-                'Nueva meta',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-            )
-          : null,
       body: SafeArea(
         child: Column(
           children: [

@@ -10,7 +10,7 @@ const functionsV1 = require("firebase-functions/v1");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 const { buildKyboEmailTemplate } = require("./emailTemplates");
-const APP_URL = "https://control-financiero-app-b9f91.web.app";
+const APP_URL = "https://kyboapp.com";
 
 function buildTrackingUrl({
   campaignId,
@@ -1057,12 +1057,29 @@ exports.markNotificationAsRead = onCall(
       }
 
       const data = notificationDoc.data() || {};
+      const campaignId = data.campaignId || null;
 
-      // 🔒 Si ya fue contada, no volver a sumar
+      let campaignRef = null;
+      let interactionRef = null;
+      let interactionDoc = null;
+
+      if (campaignId) {
+        campaignRef = admin
+          .firestore()
+          .collection("notification_campaigns")
+          .doc(campaignId);
+
+        interactionRef = campaignRef.collection("interactions").doc(uid);
+
+        // ✅ Lectura primero
+        interactionDoc = await transaction.get(interactionRef);
+      }
+
       if (data.readTracked === true) {
         return {
           success: true,
           alreadyTracked: true,
+          campaignId,
         };
       }
 
@@ -1072,19 +1089,11 @@ exports.markNotificationAsRead = onCall(
         readAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      if (data.campaignId) {
-        const campaignRef = admin
-          .firestore()
-          .collection("notification_campaigns")
-          .doc(data.campaignId);
-
+      if (campaignRef && interactionRef) {
         transaction.update(campaignRef, {
           readCount: admin.firestore.FieldValue.increment(1),
           lastInteractionAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-
-        const interactionRef = campaignRef.collection("interactions").doc(uid);
-        const interactionDoc = await transaction.get(interactionRef);
 
         transaction.set(
           interactionRef,
@@ -1107,7 +1116,7 @@ exports.markNotificationAsRead = onCall(
       return {
         success: true,
         alreadyTracked: false,
-        campaignId: data.campaignId || null,
+        campaignId,
       };
     });
   },
