@@ -173,7 +173,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
 
     final currentSnap = await currentMonthRef.get();
 
-    /// Si ya existe presupuesto para el mes actual, no hacer nada
+    // Si ya existe presupuesto para este mes, no copiar nada
     if (currentSnap.docs.isNotEmpty) {
       return false;
     }
@@ -189,7 +189,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         .collection('items')
         .get();
 
-    /// Si el mes anterior tampoco tiene datos, no clonamos nada
+    // Si el mes anterior no tiene presupuestos, no copiar nada
     if (previousSnap.docs.isEmpty) {
       return false;
     }
@@ -199,21 +199,30 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
     for (final doc in previousSnap.docs) {
       final data = doc.data();
 
-      final newDocRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('budgets')
-          .doc(_monthKey)
-          .collection('items')
-          .doc(doc.id);
+      final planned = (data['planned'] as num?)?.toDouble() ?? 0;
 
-      batch.set(newDocRef, {
-        ...data,
-        'monthKey': _monthKey,
-        'copiedFromMonth': previousMonthKey,
-        'updatedAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Solo copiar categorías con presupuesto planeado válido
+      if (planned <= 0) continue;
+
+      final newDocRef = currentMonthRef.doc(doc.id);
+
+      batch.set(
+          newDocRef,
+          {
+            'categoryId': data['categoryId'],
+            'categoryName': data['categoryName'],
+            'categoryKey': data['categoryKey'],
+            'planned': planned,
+            'color': data['color'],
+            'type': 'expense',
+            'isActive': true,
+            'period': 'monthly',
+            'monthKey': _monthKey,
+            'copiedFromMonth': previousMonthKey,
+            'updatedAt': FieldValue.serverTimestamp(),
+            'createdAt': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true));
     }
 
     await batch.commit();
@@ -2154,7 +2163,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Disponible',
+            'Disponible del presupuesto',
             style: TextStyle(
               color: Colors.white70,
               fontSize: 13,
