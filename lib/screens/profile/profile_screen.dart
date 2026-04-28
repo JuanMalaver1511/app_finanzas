@@ -750,14 +750,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       label: 'Foto de perfil',
       child: Row(
         children: [
-          Text(
-            _photoUrl != null ? 'Configurada' : 'Sin foto',
-            style: const TextStyle(
-              fontSize: 14,
-              color: kPrimary,
+          Expanded(
+            child: Text(
+              _photoUrl != null ? 'Configurada' : 'Sin foto',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                color: kPrimary,
+              ),
             ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: _uploadingPhoto ? null : _showPhotoOptions,
             child: Container(

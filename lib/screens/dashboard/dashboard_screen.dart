@@ -54,7 +54,7 @@ const kCategoryIcons = {
   'Ropa': Icons.checkroom_outlined,
   'Ingreso': Icons.trending_up,
   'Trabajo': Icons.laptop_mac,
-  'Otross': Icons.more_horiz,
+  'Otros': Icons.more_horiz,
 };
 
 Color _catColor(String cat) => kCategoryColors[cat] ?? const Color(0xFFAAAAAA);
@@ -74,7 +74,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _HeroBalanceCard extends StatelessWidget {
+class _HeroBalanceCard extends StatefulWidget {
   final String name;
   final double balance;
   final double income;
@@ -89,6 +89,13 @@ class _HeroBalanceCard extends StatelessWidget {
     required this.onAdd,
   });
 
+  @override
+  State<_HeroBalanceCard> createState() => _HeroBalanceCardState();
+}
+
+class _HeroBalanceCardState extends State<_HeroBalanceCard> {
+  bool _hideBalance = false;
+
   String get _greeting {
     final h = DateTime.now().hour;
     if (h < 12) return 'Buenos días';
@@ -97,11 +104,63 @@ class _HeroBalanceCard extends StatelessWidget {
   }
 
   String get _initials {
-    final parts = name.trim().split(' ');
+    final parts = widget.name.trim().split(' ');
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
+    return widget.name.isNotEmpty ? widget.name[0].toUpperCase() : '?';
+  }
+
+  double get _expensePercent {
+    if (widget.income <= 0) return 0;
+    return (widget.expense / widget.income).clamp(0.0, 1.5);
+  }
+
+  String _getInsight() {
+    if (widget.income == 0 && widget.expense == 0) {
+      return 'Empieza registrando tus movimientos';
+    }
+
+    if (widget.balance < 0) {
+      return 'Puedes optimizar tus gastos';
+    }
+
+    if (widget.income > 0 && widget.expense > widget.income * 0.8) {
+      return 'Estás cerca de tu límite';
+    }
+
+    return 'Vas bien este mes';
+  }
+
+  String _monthlyHint() {
+    if (widget.income <= 0 && widget.expense <= 0) {
+      return 'Registra tus ingresos y gastos para ver tu resumen.';
+    }
+
+    if (widget.income <= 0) {
+      return 'Aún no tienes ingresos registrados este mes.';
+    }
+
+    final percent = (widget.expense / widget.income * 100).round();
+
+    if (widget.balance < 0) {
+      return 'Tus gastos superan tus ingresos este mes.';
+    }
+
+    return 'Has usado el $percent% de tus ingresos registrados.';
+  }
+
+  Color get _statusColor {
+    if (widget.balance < 0) return kRed;
+    if (widget.income > 0 && widget.expense > widget.income * 0.8) {
+      return kAmber;
+    }
+    return kGreen;
+  }
+
+  String _moneyOrHidden(double value) {
+    if (_hideBalance) return r'$••••••• COP';
+    return _formatMoney(value);
   }
 
   @override
@@ -113,7 +172,10 @@ class _HeroBalanceCard extends StatelessWidget {
       padding: EdgeInsets.all(isMobile ? 18 : 22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1A1A2E), Color(0xFF22264A)],
+          colors: [
+            Color(0xFF191936),
+            Color(0xFF22264A),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -122,25 +184,26 @@ class _HeroBalanceCard extends StatelessWidget {
           BoxShadow(
             color: kDark.withOpacity(0.20),
             blurRadius: 24,
-            offset: const Offset(0, 10),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🔥 BOTÓN IA
-          const IAInsightButton(),
-
+          Row(
+            children: const [
+              IAInsightButton(),
+            ],
+          ),
           const SizedBox(height: 16),
-
           Row(
             children: [
               Container(
                 width: isMobile ? 46 : 54,
                 height: isMobile ? 46 : 54,
                 decoration: BoxDecoration(
-                  color: kAmber.withOpacity(0.18),
+                  color: kAmber.withOpacity(0.16),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: kAmber.withOpacity(0.35)),
                 ),
@@ -149,7 +212,7 @@ class _HeroBalanceCard extends StatelessWidget {
                   _initials,
                   style: TextStyle(
                     color: kAmber,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                     fontSize: isMobile ? 17 : 20,
                   ),
                 ),
@@ -162,112 +225,164 @@ class _HeroBalanceCard extends StatelessWidget {
                     Text(
                       '$_greeting,',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.72),
+                        color: Colors.white.withOpacity(0.70),
                         fontSize: isMobile ? 12 : 13,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      name,
+                      widget.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: isMobile ? 18 : 22,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (!isMobile)
-                FilledButton.icon(
-                  onPressed: onAdd,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: kAmber,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text(
-                    'Nueva transacción',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
             ],
           ),
-
           const SizedBox(height: 22),
-
-          Text(
-            'Saldo disponible',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.70),
-              fontSize: 13,
-            ),
+          Row(
+            children: [
+              Text(
+                'Tu dinero disponible',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.70),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => setState(() => _hideBalance = !_hideBalance),
+                borderRadius: BorderRadius.circular(999),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    _hideBalance
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    color: Colors.white.withOpacity(0.82),
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
           ),
-
           const SizedBox(height: 6),
-
-          Text(
-            _formatMoney(balance),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: isMobile ? 26 : 36,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: (balance >= 0 ? kGreen : kRed).withOpacity(0.16),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: (balance >= 0 ? kGreen : kRed).withOpacity(0.30),
-              ),
-            ),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.08),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
             child: Text(
-              balance >= 0 ? 'Balance positivo' : 'Balance negativo',
+              _moneyOrHidden(widget.balance),
+              key: ValueKey('${_hideBalance}_${widget.balance}'),
               style: TextStyle(
-                color: balance >= 0
-                    ? const Color(0xFF86E6AE)
-                    : const Color(0xFFFF9A8A),
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+                color:
+                    widget.balance < 0 ? const Color(0xFFFF6B5F) : Colors.white,
+                fontSize: isMobile ? 28 : 38,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.2,
               ),
             ),
           ),
-
-          const SizedBox(height: 18),
-
-          const SizedBox(height: 18),
-
-          if (isMobile) ...[
-            _heroMiniStat(
-              icon: Icons.south_rounded,
-              color: kGreen,
-              label: 'Ingresos',
-              value: _formatMoney(income),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: _statusColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: _statusColor.withOpacity(0.28)),
+                ),
+                child: Text(
+                  _getInsight(),
+                  style: TextStyle(
+                    color: _statusColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                ),
+                child: Text(
+                  _monthlyHint(),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.72),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          if (widget.income > 0) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(
+                  begin: 0,
+                  end: _expensePercent.clamp(0.0, 1.0),
+                ),
+                duration: const Duration(milliseconds: 800),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, _) {
+                  return LinearProgressIndicator(
+                    value: value,
+                    minHeight: 7,
+                    backgroundColor: Colors.white.withOpacity(0.09),
+                    valueColor: AlwaysStoppedAnimation<Color>(_statusColor),
+                  );
+                },
+              ),
             ),
-            const SizedBox(height: 12),
-            _heroMiniStat(
-              icon: Icons.north_rounded,
-              color: kRed,
-              label: 'Gastos',
-              value: _formatMoney(expense),
-            ),
-          ] else ...[
+            const SizedBox(height: 16),
+          ],
+          if (isMobile)
+            Column(
+              children: [
+                _heroMiniStat(
+                  icon: Icons.south_rounded,
+                  color: kGreen,
+                  label: 'Ingresos',
+                  value: _moneyOrHidden(widget.income),
+                ),
+                const SizedBox(height: 10),
+                _heroMiniStat(
+                  icon: Icons.north_rounded,
+                  color: kRed,
+                  label: 'Gastos',
+                  value: _moneyOrHidden(widget.expense),
+                ),
+              ],
+            )
+          else
             Row(
               children: [
                 Expanded(
@@ -275,21 +390,20 @@ class _HeroBalanceCard extends StatelessWidget {
                     icon: Icons.south_rounded,
                     color: kGreen,
                     label: 'Ingresos',
-                    value: _formatMoney(income),
+                    value: _moneyOrHidden(widget.income),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: _heroMiniStat(
                     icon: Icons.north_rounded,
                     color: kRed,
                     label: 'Gastos',
-                    value: _formatMoney(expense),
+                    value: _moneyOrHidden(widget.expense),
                   ),
                 ),
               ],
             ),
-          ],
         ],
       ),
     );
@@ -305,45 +419,47 @@ class _HeroBalanceCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withOpacity(0.085),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: Colors.white.withOpacity(0.07)),
       ),
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               color: color.withOpacity(0.14),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: 21),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.68),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20,
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: Text(
+                    value,
+                    key: ValueKey(value),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ],
@@ -352,6 +468,222 @@ class _HeroBalanceCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _QuickActionsRow extends StatelessWidget {
+  final VoidCallback onAdd;
+  final VoidCallback onOpenBudgets;
+
+  const _QuickActionsRow({
+    required this.onAdd,
+    required this.onOpenBudgets,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickActionButton(
+            icon: Icons.add_rounded,
+            label: isMobile ? 'Movimiento' : 'Nuevo movimiento',
+            color: kAmber,
+            onTap: onAdd,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _QuickActionButton(
+            icon: Icons.account_balance_wallet_outlined,
+            label: isMobile ? 'Presupuesto' : 'Ver presupuesto',
+            color: kPrimary,
+            onTap: onOpenBudgets,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kCard,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFEAECEF)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.035),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: kDark,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardInsightCard extends StatelessWidget {
+  final List<AppTransaction> transactions;
+  final double income;
+  final double expense;
+  final double balance;
+
+  const _DashboardInsightCard({
+    required this.transactions,
+    required this.income,
+    required this.expense,
+    required this.balance,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+
+    final currentMonthExpenses = transactions.where((t) {
+      return !t.isIncome &&
+          t.date.year == now.year &&
+          t.date.month == now.month;
+    }).toList();
+
+    final Map<String, double> totals = {};
+    for (final tx in currentMonthExpenses) {
+      totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
+    }
+
+    final topCategory = totals.entries.isEmpty
+        ? null
+        : (totals.entries.toList()..sort((a, b) => b.value.compareTo(a.value)))
+            .first;
+
+    final message = _message(topCategory);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.045),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: kAmber.withOpacity(0.13),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: kAmber),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Insight KYBO',
+                  style: TextStyle(
+                    color: kDark,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: kGrey,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _message(MapEntry<String, double>? topCategory) {
+    if (income == 0 && expense == 0) {
+      return 'Registra tus primeros movimientos para empezar a recibir recomendaciones.';
+    }
+
+    if (balance < 0) {
+      return 'Tus gastos superan tus ingresos. Revisa tus categorías con mayor consumo.';
+    }
+
+    if (topCategory != null) {
+      return 'Este mes tu mayor gasto está en ${topCategory.key}. Puedes revisarlo en reportes.';
+    }
+
+    if (income > 0 && expense <= income * 0.7) {
+      return 'Buen ritmo: tus gastos están por debajo de tus ingresos.';
+    }
+
+    return 'Sigue registrando tus movimientos para mejorar el análisis financiero.';
   }
 }
 
@@ -640,14 +972,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      // ✅ FAB en móvil para agregar transacción
-      floatingActionButton: isMobile
-          ? FloatingActionButton(
-              onPressed: _showAddDialog,
-              backgroundColor: kAmber,
-              child: const Icon(Icons.add, color: Colors.white),
-            )
-          : null,
       body: StreamBuilder<List<AppTransaction>>(
         stream: _txService.stream(),
         builder: (context, snapshot) {
@@ -671,7 +995,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 TopBar(
-                  onNew: () {},
+                  onNew: _showAddDialog,
+                  showNewButton: true,
                   onNotifications: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -697,53 +1022,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           expense: expense,
                           onAdd: _showAddDialog,
                         ),
+                        const SizedBox(height: 12),
+
+                        _DashboardInsightCard(
+                          transactions: transactions,
+                          income: income,
+                          expense: expense,
+                          balance: balance,
+                        ),
                         const SizedBox(height: 16),
 
                         if (transactions.isNotEmpty) ...[
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              if (constraints.maxWidth < 600) {
-                                return Column(
-                                  children: [
-                                    _DonutCard(transactions: transactions),
-                                    const SizedBox(height: 16),
-                                    _BudgetBarsCard(
-                                      transactions: transactions,
-                                      onOpenBudgets: () => widget.onChange(2),
-                                    ),
-                                  ],
-                                );
-                              }
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child:
-                                        _DonutCard(transactions: transactions),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: _BudgetBarsCard(
-                                      transactions: transactions,
-                                      onOpenBudgets: () => widget.onChange(2),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          _GoalsHighlightCard(
-                            goalService: _goalService,
-                            onOpenGoals: () => widget.onChange(3),
+                          _BudgetBarsCard(
+                            transactions: transactions,
+                            onOpenBudgets: () => widget.onChange(2),
                           ),
                           const SizedBox(height: 16),
                         ],
+
+                        _GoalsHighlightCard(
+                          goalService: _goalService,
+                          onOpenGoals: () => widget.onChange(4),
+                        ),
+                        const SizedBox(height: 16),
 
                         _TransactionsCard(
                           transactions: transactions,
                           onDelete: (id) => _txService.delete(id),
                           onEdit: _showEditDialog,
+                          onViewAll: () => widget.onChange(1),
                         ),
 
                         // Espacio extra en móvil para el FAB
@@ -756,138 +1063,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-// ─── WELCOME BANNER ────────────────────────────────────────────────────────────
-
-class _WelcomeBanner extends StatelessWidget {
-  final String name;
-  const _WelcomeBanner({required this.name});
-
-  String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return '¡Buenos días';
-    if (h < 18) return '¡Buenas tardes';
-    return '¡Buenas noches';
-  }
-
-  String get _initials {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    return name.isNotEmpty ? name[0].toUpperCase() : '?';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 20,
-        vertical: isMobile ? 16 : 20,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Colors.white, Color(0xFFFFF4DC)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: const Color(0xFFFFE0A0), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: kAmber.withOpacity(0.15),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Avatar
-          Container(
-            width: isMobile ? 44 : 52,
-            height: isMobile ? 44 : 52,
-            decoration: BoxDecoration(
-              color: kAmber.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kAmber.withOpacity(0.6), width: 1.5),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              _initials,
-              style: TextStyle(
-                fontSize: isMobile ? 16 : 20,
-                fontWeight: FontWeight.bold,
-                color: kAmber,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // Textos
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$_greeting,',
-                  style: TextStyle(
-                    fontSize: isMobile ? 12 : 13,
-                    color: kGrey,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontSize: isMobile ? 16 : 20,
-                    fontWeight: FontWeight.bold,
-                    color: kDark,
-                    letterSpacing: 0.2,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: kGreen,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    const Text(
-                      'Finanzas al día',
-                      style: TextStyle(fontSize: 11, color: kGrey),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Icono decorativo — oculto en móvil para ahorrar espacio
-          if (!isMobile)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kAmber.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kAmber.withOpacity(0.3), width: 1),
-              ),
-              child:
-                  const Icon(Icons.bar_chart_rounded, color: kAmber, size: 26),
-            ),
-        ],
       ),
     );
   }
@@ -1167,6 +1342,7 @@ class _BudgetBarsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -1187,11 +1363,54 @@ class _BudgetBarsCard extends StatelessWidget {
           return Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(22),
               onTap: onOpenBudgets,
-              child: _emptyCard(
-                'Presupuesto del mes',
-                'Aún no has definido presupuestos. Toca para configurarlos.',
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: _cardDecoration(radius: 22),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: kAmber.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        color: kAmber,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Presupuesto del mes',
+                            style: TextStyle(
+                              color: kDark,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Configura tus límites para controlar mejor tus gastos.',
+                            style: TextStyle(
+                              color: kGrey,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: kGrey),
+                  ],
+                ),
               ),
             ),
           );
@@ -1210,140 +1429,213 @@ class _BudgetBarsCard extends StatelessWidget {
           totals[tx.category] = (totals[tx.category] ?? 0) + tx.amount;
         }
 
-        final items = docs.map((d) {
-          final data = d.data() as Map<String, dynamic>;
-
-          return {
-            'name': data['categoryName'],
-            'planned': ((data['planned'] ?? 0) as num).toDouble(),
-            'color': data['color'] ?? '#6366F1',
-          };
-        }).toList();
+        final items = docs
+            .map((d) {
+              final data = d.data() as Map<String, dynamic>;
+              return {
+                'name': (data['categoryName'] ?? '').toString(),
+                'planned': ((data['planned'] ?? 0) as num).toDouble(),
+                'color': (data['color'] ?? '#6366F1').toString(),
+              };
+            })
+            .where((i) => (i['name'] as String).isNotEmpty)
+            .toList();
 
         final totalBudget =
-            items.fold<double>(0, (sum, i) => sum + i['planned']);
+            items.fold<double>(0, (sum, i) => sum + (i['planned'] as double));
         final totalSpent = totals.values.fold<double>(0, (sum, v) => sum + v);
+        final remaining = totalBudget - totalSpent;
 
         final totalProgress =
             totalBudget > 0 ? (totalSpent / totalBudget).clamp(0.0, 1.0) : 0.0;
 
+        final sortedItems = [...items]..sort((a, b) {
+            final aName = a['name'] as String;
+            final bName = b['name'] as String;
+            final aPlanned = a['planned'] as double;
+            final bPlanned = b['planned'] as double;
+            final aSpent = totals[aName] ?? 0.0;
+            final bSpent = totals[bName] ?? 0.0;
+            final aPct = aPlanned > 0 ? aSpent / aPlanned : 0.0;
+            final bPct = bPlanned > 0 ? bSpent / bPlanned : 0.0;
+            return bPct.compareTo(aPct);
+          });
+
+        final previewItems = sortedItems.take(3).toList();
+        final progressColor = totalProgress >= 1
+            ? kRed
+            : totalProgress >= 0.8
+                ? kAmber
+                : kPrimary;
+
         return Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(22),
             onTap: onOpenBudgets,
             child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: _cardDecoration(),
+              width: double.infinity,
+              padding: EdgeInsets.all(isMobile ? 18 : 20),
+              decoration: _cardDecoration(radius: 22),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // HEADER
-                  const Row(
+                  Row(
                     children: [
-                      Expanded(
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: kPrimary.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          Icons.pie_chart_outline_rounded,
+                          color: kPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Presupuesto del mes',
                               style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
                                 color: kDark,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            SizedBox(height: 3),
                             Text(
-                              'Basado en tu configuración',
-                              style: TextStyle(fontSize: 12, color: kGrey),
+                              'Resumen rápido de tus límites',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: kGrey,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: kGrey),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: progressColor.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${(totalProgress * 100).round()}%',
+                          style: TextStyle(
+                            color: progressColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-
                   const SizedBox(height: 18),
-
-                  // RESUMEN
                   ClipRRect(
                     borderRadius: BorderRadius.circular(999),
                     child: LinearProgressIndicator(
                       value: totalProgress,
-                      minHeight: 8,
+                      minHeight: 10,
                       backgroundColor: const Color(0xFFEAECEF),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        totalProgress >= 1
-                            ? kRed
-                            : totalProgress >= 0.8
-                                ? kAmber
-                                : kPrimary,
-                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // ITEMS
-                  ...items.map((item) {
-                    final name = item['name'];
-                    final planned = item['planned'];
-                    final color = _parseColor(item['color']);
-
-                    final spent = totals[name] ?? 0.0;
-                    final pct =
-                        planned > 0 ? (spent / planned).clamp(0.0, 1.0) : 0.0;
-                    final exceeded = spent > planned;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: kDark,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${_formatMoney(spent)} / ${_formatMoney(planned)}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: exceeded ? kRed : kGrey,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          LinearProgressIndicator(
-                            value: pct,
-                            minHeight: 6,
-                            backgroundColor: const Color(0xFFEAECEF),
-                            valueColor: AlwaysStoppedAnimation(
-                              exceeded ? kRed : color,
-                            ),
-                          ),
-                        ],
+                  const SizedBox(height: 8),
+                  Text(
+                    totalProgress >= 1
+                        ? 'Superaste tu presupuesto del mes'
+                        : 'Vas ${(totalProgress * 100).round()}% del presupuesto mensual',
+                    style: TextStyle(
+                      color: progressColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _BudgetResumeBox(
+                          label: 'Gastado',
+                          value: _formatMoney(totalSpent, compact: true),
+                        ),
                       ),
-                    );
-                  }),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _BudgetResumeBox(
+                          label: remaining >= 0 ? 'Disponible' : 'Excedido',
+                          value: _formatMoney(remaining.abs(), compact: true),
+                          danger: remaining < 0,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _BudgetResumeBox(
+                          label: 'Total',
+                          value: _formatMoney(totalBudget, compact: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (previewItems.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    ...previewItems.map((item) {
+                      final name = item['name'] as String;
+                      final planned = item['planned'] as double;
+                      final spent = totals[name] ?? 0.0;
+                      final pct =
+                          planned > 0 ? (spent / planned).clamp(0.0, 1.0) : 0.0;
+                      final exceeded = spent > planned;
+                      final color = exceeded ? kRed : _catColor(name);
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 9,
+                              height: 9,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: kDark,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${(pct * 100).round()}%',
+                              style: TextStyle(
+                                color: exceeded ? kRed : kGrey,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
                 ],
               ),
             ),
@@ -1354,18 +1646,74 @@ class _BudgetBarsCard extends StatelessWidget {
   }
 
   Widget _loadingCard() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onOpenBudgets,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: _cardDecoration(),
-          child: const Center(
-            child: CircularProgressIndicator(),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: _cardDecoration(radius: 22),
+      child: const Row(
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.2),
           ),
+          SizedBox(width: 12),
+          Text(
+            'Cargando presupuesto...',
+            style: TextStyle(color: kGrey, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BudgetResumeBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool danger;
+
+  const _BudgetResumeBox({
+    required this.label,
+    required this.value,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: danger ? kRed.withOpacity(0.08) : const Color(0xFFF8F9FC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: danger ? kRed.withOpacity(0.16) : const Color(0xFFEAECEF),
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: danger ? kRed : kGrey,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: danger ? kRed : kDark,
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1376,25 +1724,66 @@ class _BudgetBarsCard extends StatelessWidget {
 class _TransactionsCard extends StatelessWidget {
   final List<AppTransaction> transactions;
   final void Function(String id) onDelete;
-  final void Function(AppTransaction tx) onEdit; // ✅
+  final void Function(AppTransaction tx) onEdit;
+  final VoidCallback onViewAll;
 
   const _TransactionsCard({
     required this.transactions,
     required this.onDelete,
     required this.onEdit,
+    required this.onViewAll,
   });
 
   @override
   Widget build(BuildContext context) {
+    final recentTransactions = transactions.take(5).toList();
+
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(radius: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Transacciones recientes',
-              style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.bold, color: kDark)),
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Últimos movimientos',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: kDark,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Tus 5 transacciones más recientes',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: kGrey,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onViewAll,
+                style: TextButton.styleFrom(
+                  foregroundColor: kPrimary,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                label: const Text(
+                  'Ver todos',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           if (transactions.isEmpty)
             const Padding(
@@ -1404,24 +1793,28 @@ class _TransactionsCard extends StatelessWidget {
                   children: [
                     Icon(Icons.receipt_long_outlined, size: 48, color: kGrey),
                     SizedBox(height: 10),
-                    Text('Sin transacciones aún',
-                        style: TextStyle(color: kGrey, fontSize: 14)),
+                    Text(
+                      'Sin transacciones aún',
+                      style: TextStyle(color: kGrey, fontSize: 14),
+                    ),
                     SizedBox(height: 4),
-                    Text('Presiona + para comenzar',
-                        style: TextStyle(color: kGrey, fontSize: 12)),
+                    Text(
+                      'Presiona + para comenzar',
+                      style: TextStyle(color: kGrey, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
             )
           else
-            ...transactions.asMap().entries.map((e) => Column(
+            ...recentTransactions.asMap().entries.map((e) => Column(
                   children: [
                     _TxRow(
                       tx: e.value,
                       onDelete: () => onDelete(e.value.id),
                       onEdit: () => onEdit(e.value),
                     ),
-                    if (e.key < transactions.length - 1)
+                    if (e.key < recentTransactions.length - 1)
                       Divider(height: 1, color: Colors.grey[100]),
                   ],
                 )),
@@ -1556,9 +1949,9 @@ class _TxRow extends StatelessWidget {
 
 // ─── HELPERS ───────────────────────────────────────────────────────────────────
 
-BoxDecoration _cardDecoration() => BoxDecoration(
+BoxDecoration _cardDecoration({double radius = 16}) => BoxDecoration(
       color: kCard,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(radius),
       boxShadow: [
         BoxShadow(
             color: Colors.black.withOpacity(0.05),

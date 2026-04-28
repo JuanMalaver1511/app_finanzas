@@ -3,7 +3,7 @@ function buildKyboEmailTemplate({
   title,
   message,
   buttonText = "Abrir KYBO",
-  buttonUrl = "#",
+  buttonUrl = "",
   userName = "",
   badge = "Mensaje importante",
 }) {

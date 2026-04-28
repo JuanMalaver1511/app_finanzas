@@ -325,6 +325,57 @@ module.exports = ({
     return { app, push, email };
   }
 
+  async function processFinanceAutomationCampaign({
+    users,
+    campaignTitle,
+    campaignMessage,
+    category,
+    priority,
+    sendEmail,
+    buildMessageForUser,
+  }) {
+    const campaignRef = await createNotificationCampaign({
+      title: campaignTitle,
+      message: campaignMessage,
+      category,
+      campaignType: "finance_auto",
+      source: "finance_automation",
+      target: "automatic",
+      sendApp: true,
+      sendEmail,
+      priority,
+    });
+
+    let app = 0;
+    let push = 0;
+    let email = 0;
+
+    for (const item of users) {
+      const userDoc = item.userDoc || item;
+      const message = await buildMessageForUser(item);
+
+      if (!message) continue;
+
+      const result = await sendAutomaticFinanceMessage(
+        userDoc,
+        message,
+        campaignRef,
+      );
+
+      app += result.app;
+      push += result.push;
+      email += result.email;
+    }
+
+    return {
+      success: true,
+      campaignId: campaignRef.id,
+      app,
+      push,
+      email,
+    };
+  }
+
   const sendFinanceAlertsScheduled = onSchedule(
     {
       schedule: "0 20 * * 1,3,5",
@@ -333,39 +384,19 @@ module.exports = ({
     async () => {
       const users = await getEligibleUsers();
 
-      let app = 0;
-      let push = 0;
-      let email = 0;
-
-      for (const userDoc of users) {
-        const finance = await getUserMonthSummary(userDoc.id);
-        const message = buildFinanceAlert(finance);
-
-        if (!message) continue;
-
-        const campaignRef = await createNotificationCampaign({
-          title: message.title,
-          message: message.body,
-          category: message.type,
-          campaignType: "finance_auto",
-          source: "finance_automation",
-          target: "automatic",
-          sendApp: true,
-          sendEmail: message.sendEmail === true,
-          priority: message.priority,
-        });
-
-        const result = await sendAutomaticFinanceMessage(
-          userDoc,
-          message,
-          campaignRef,
-        );
-        app += result.app;
-        push += result.push;
-        email += result.email;
-      }
-
-      return { success: true, app, push, email };
+      return await processFinanceAutomationCampaign({
+        users,
+        campaignTitle: "Alertas financieras automáticas",
+        campaignMessage:
+          "KYBO revisó tus finanzas y encontró alertas importantes para ayudarte a mantener el control.",
+        category: "finance_alerts",
+        priority: "high",
+        sendEmail: true,
+        buildMessageForUser: async (userDoc) => {
+          const finance = await getUserMonthSummary(userDoc.id);
+          return buildFinanceAlert(finance);
+        },
+      });
     },
   );
 
@@ -377,50 +408,36 @@ module.exports = ({
     async () => {
       const users = await getEligibleUsers();
 
-      let app = 0;
-      let push = 0;
-      let email = 0;
+      return await processFinanceAutomationCampaign({
+        users,
+        campaignTitle: "Recordatorio de movimientos",
+        campaignMessage:
+          "KYBO recordó a los usuarios registrar sus ingresos y gastos para mantener una visión clara de su dinero.",
+        category: "no_movements_reminder",
+        priority: "medium",
+        sendEmail: true,
+        buildMessageForUser: async (userDoc) => {
+          const finance = await getUserMonthSummary(userDoc.id);
 
-      for (const userDoc of users) {
-        const finance = await getUserMonthSummary(userDoc.id);
+          if (
+            finance.ingresos > 0 ||
+            finance.gastos > 0 ||
+            finance.deudas > 0
+          ) {
+            return null;
+          }
 
-        if (finance.ingresos > 0 || finance.gastos > 0 || finance.deudas > 0) {
-          continue;
-        }
-
-        const message = {
-          title: "Organiza tus finanzas esta semana",
-          body: "Aún no registras movimientos este mes. Dedica unos minutos a ingresar tus ingresos y gastos para tener una visión clara de tu dinero.",
-          type: "no_movements_reminder",
-          priority: "medium",
-          sendEmail: true,
-          appCooldownDays: 3,
-          emailCooldownDays: 3,
-        };
-
-        const campaignRef = await createNotificationCampaign({
-          title: message.title,
-          message: message.body,
-          category: message.type,
-          campaignType: "finance_auto",
-          source: "finance_automation",
-          target: "automatic",
-          sendApp: true,
-          sendEmail: message.sendEmail === true,
-          priority: message.priority,
-        });
-
-        const result = await sendAutomaticFinanceMessage(
-          userDoc,
-          message,
-          campaignRef,
-        );
-        app += result.app;
-        push += result.push;
-        email += result.email;
-      }
-
-      return { success: true, app, push, email };
+          return {
+            title: "Organiza tus finanzas esta semana",
+            body: "Aún no registras movimientos este mes. Dedica unos minutos a ingresar tus ingresos y gastos para tener una visión clara de tu dinero.",
+            type: "no_movements_reminder",
+            priority: "medium",
+            sendEmail: true,
+            appCooldownDays: 3,
+            emailCooldownDays: 3,
+          };
+        },
+      });
     },
   );
 
@@ -432,12 +449,15 @@ module.exports = ({
     async () => {
       const users = await getEligibleUsers();
 
-      let app = 0;
-      let push = 0;
-      let email = 0;
-
-      for (const userDoc of users) {
-        const message = {
+      return await processFinanceAutomationCampaign({
+        users,
+        campaignTitle: "Pequeños hábitos, grandes cambios",
+        campaignMessage:
+          "Registrar tus movimientos de forma constante te ayuda a tomar mejores decisiones y mantener el control de tu dinero.",
+        category: "weekly_motivation",
+        priority: "low",
+        sendEmail: true,
+        buildMessageForUser: async () => ({
           title: "Pequeños hábitos, grandes cambios",
           body: "Registrar tus movimientos de forma constante te ayuda a tomar mejores decisiones y mantener el control de tu dinero.",
           type: "weekly_motivation",
@@ -445,31 +465,8 @@ module.exports = ({
           sendEmail: true,
           appCooldownDays: 7,
           emailCooldownDays: 7,
-        };
-
-        const campaignRef = await createNotificationCampaign({
-          title: message.title,
-          message: message.body,
-          category: message.type,
-          campaignType: "finance_auto",
-          source: "finance_automation",
-          target: "automatic",
-          sendApp: true,
-          sendEmail: message.sendEmail === true,
-          priority: message.priority,
-        });
-
-        const result = await sendAutomaticFinanceMessage(
-          userDoc,
-          message,
-          campaignRef,
-        );
-        app += result.app;
-        push += result.push;
-        email += result.email;
-      }
-
-      return { success: true, app, push, email };
+        }),
+      });
     },
   );
 
@@ -482,46 +479,27 @@ module.exports = ({
       const users = await getEligibleUsers();
       const { start, end } = getPreviousWeekRange();
 
-      let app = 0;
-      let push = 0;
-      let email = 0;
+      return await processFinanceAutomationCampaign({
+        users,
+        campaignTitle: "Resumen financiero semanal",
+        campaignMessage: `Resumen automático de la semana ${dateKey(start)}.`,
+        category: `weekly_finance_summary_${dateKey(start)}`,
+        priority: "medium",
+        sendEmail: true,
+        buildMessageForUser: async (userDoc) => {
+          const finance = await getUserWeekSummary(userDoc.id, start, end);
 
-      for (const userDoc of users) {
-        const finance = await getUserWeekSummary(userDoc.id, start, end);
-
-        const message = {
-          title: "Resumen financiero semanal",
-          body: `La semana anterior cerraste con ingresos de ${formatCOP(finance.ingresos)}, gastos de ${formatCOP(finance.gastos)} y un balance de ${formatCOP(finance.balance)}.`,
-          type: `weekly_finance_summary_${dateKey(start)}`,
-          priority: "medium",
-          sendEmail: true,
-          appCooldownDays: 7,
-          emailCooldownDays: 7,
-        };
-
-        const campaignRef = await createNotificationCampaign({
-          title: message.title,
-          message: message.body,
-          category: message.type,
-          campaignType: "finance_auto",
-          source: "finance_automation",
-          target: "automatic",
-          sendApp: true,
-          sendEmail: message.sendEmail === true,
-          priority: message.priority,
-        });
-
-        const result = await sendAutomaticFinanceMessage(
-          userDoc,
-          message,
-          campaignRef,
-        );
-        app += result.app;
-        push += result.push;
-        email += result.email;
-      }
-
-      return { success: true, app, push, email };
+          return {
+            title: "Resumen financiero semanal",
+            body: `La semana anterior cerraste con ingresos de ${formatCOP(finance.ingresos)}, gastos de ${formatCOP(finance.gastos)} y un balance de ${formatCOP(finance.balance)}.`,
+            type: `weekly_finance_summary_${dateKey(start)}`,
+            priority: "medium",
+            sendEmail: true,
+            appCooldownDays: 7,
+            emailCooldownDays: 7,
+          };
+        },
+      });
     },
   );
 
@@ -544,7 +522,7 @@ module.exports = ({
         .where("dia_pago", "==", dueDay)
         .get();
 
-      const users = new Map();
+      const usersMap = new Map();
 
       for (const doc of debtsSnapshot.docs) {
         const data = doc.data();
@@ -557,7 +535,7 @@ module.exports = ({
 
         const uid = userDocRef.id;
 
-        const current = users.get(uid) || [];
+        const current = usersMap.get(uid) || [];
         current.push({
           id: doc.id,
           nombre: data.nombre || "Deuda",
@@ -566,14 +544,12 @@ module.exports = ({
           diaPago: dueDay,
         });
 
-        users.set(uid, current);
+        usersMap.set(uid, current);
       }
 
-      let app = 0;
-      let push = 0;
-      let email = 0;
+      const users = [];
 
-      for (const [uid, debts] of users.entries()) {
+      for (const [uid, debts] of usersMap.entries()) {
         const userDoc = await admin
           .firestore()
           .collection("users")
@@ -589,43 +565,35 @@ module.exports = ({
 
         if (role === "admin" || blocked) continue;
 
-        const rows = debts
-          .map((debt) => `${debt.nombre}: cuota ${formatCOP(debt.cuota)}`)
-          .join(", ");
-
-        const message = {
-          title: "Recordatorio de pago para mañana",
-          body: `Mañana vence una o más cuotas: ${rows}. Registra tu pago en KYBO para mantener tus deudas bajo control.`,
-          type: `debt_upcoming_${currentMonth}_${dueDay}`,
-          priority: "high",
-          sendEmail: true,
-          appCooldownDays: 3,
-          emailCooldownDays: 3,
-        };
-
-        const campaignRef = await createNotificationCampaign({
-          title: message.title,
-          message: message.body,
-          category: message.type,
-          campaignType: "finance_auto",
-          source: "finance_automation",
-          target: "automatic",
-          sendApp: true,
-          sendEmail: message.sendEmail === true,
-          priority: message.priority,
-        });
-
-        const result = await sendAutomaticFinanceMessage(
+        users.push({
           userDoc,
-          message,
-          campaignRef,
-        );
-        app += result.app;
-        push += result.push;
-        email += result.email;
+          debts,
+        });
       }
 
-      return { success: true, app, push, email };
+      return await processFinanceAutomationCampaign({
+        users,
+        campaignTitle: "Recordatorio de deudas próximas",
+        campaignMessage: `Recordatorio automático para deudas que vencen mañana, día ${dueDay}.`,
+        category: `debt_upcoming_${currentMonth}_${dueDay}`,
+        priority: "high",
+        sendEmail: true,
+        buildMessageForUser: async ({ debts }) => {
+          const rows = debts
+            .map((debt) => `${debt.nombre}: cuota ${formatCOP(debt.cuota)}`)
+            .join(", ");
+
+          return {
+            title: "Recordatorio de pago para mañana",
+            body: `Mañana vence una o más cuotas: ${rows}. Registra tu pago en KYBO para mantener tus deudas bajo control.`,
+            type: `debt_upcoming_${currentMonth}_${dueDay}`,
+            priority: "high",
+            sendEmail: true,
+            appCooldownDays: 3,
+            emailCooldownDays: 3,
+          };
+        },
+      });
     },
   );
 

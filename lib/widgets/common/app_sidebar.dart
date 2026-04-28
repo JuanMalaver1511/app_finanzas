@@ -22,128 +22,141 @@ class AppSidebar extends StatelessWidget {
       decoration: const BoxDecoration(
         color: kDark,
       ),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
+      child: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
 
-          // LOGO
-          Column(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: kAmber,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.savings, color: Colors.white),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                "Kybo",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 18),
-
-          // MENÚ
-          _item(Icons.dashboard_outlined, "Inicio", 0),
-          _item(Icons.swap_horiz, "Mov.", 1),
-          _item(Icons.pie_chart_outline, "Pres.", 2),
-          _item(Icons.flag_outlined, "Metas", 3),
-          _item(Icons.credit_card, "Deudas", 4),
-          _item(Icons.person_outline, "Perfil", 5),
-
-          const Spacer(),
-          GestureDetector(
-            onTap: () {
-              showDialog(
-                context: context,
-                barrierColor: Colors.black54,
-                builder: (context) {
-                  return Center(
-                    child: Container(
-                      width: 320,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2EEF5),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Cerrar sesión",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            "¿Estás seguro de que deseas cerrar sesión?",
-                            style: TextStyle(fontSize: 13),
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text("Cancelar"),
-                              ),
-                              const SizedBox(width: 10),
-                              ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kAmber,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 10,
-                                  ),
-                                ),
-                                onPressed: () async {
-                                  Navigator.pop(context);
-                                  await FirebaseAuth.instance.signOut();
-                                },
-                                child: const Text("Cerrar sesión"),
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-
-            // ESTE ES EL FIX
-            child: const Padding(
-              padding: EdgeInsets.only(bottom: 14),
-              child: Column(
-                children: [
-                  Icon(Icons.logout, color: Colors.white70),
-                  SizedBox(height: 4),
-                  Text(
-                    "Salir",
-                    style: TextStyle(color: Colors.white60, fontSize: 10),
+            // LOGO FIJO
+            Column(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: kAmber,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                ],
+                  child: const Icon(Icons.savings, color: Colors.white),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  "Kybo",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // MENÚ CON SCROLL
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  children: [
+                    _item(Icons.dashboard_outlined, "Inicio", 0),
+                    _item(Icons.swap_horiz, "Mov.", 1),
+                    _item(Icons.pie_chart_outline, "Pres.", 2),
+                    _item(Icons.bar_chart_rounded, "Reportes", 3),
+                    _item(Icons.flag_outlined, "Metas", 4),
+                    _item(Icons.credit_card, "Deudas", 5),
+                    _item(Icons.person_outline, "Perfil", 6),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+
+            // SALIR FIJO ABAJO
+            GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  barrierColor: Colors.black54,
+                  builder: (context) {
+                    return Center(
+                      child: Material(
+                        color: Colors.transparent,
+                        child: Container(
+                          width: 320,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF2EEF5),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Cerrar sesión",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                "¿Estás seguro de que deseas cerrar sesión?",
+                                style: TextStyle(fontSize: 13),
+                              ),
+                              const SizedBox(height: 14),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text("Cancelar"),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: kAmber,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 18,
+                                        vertical: 10,
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      Navigator.pop(context);
+                                      await FirebaseAuth.instance.signOut();
+                                    },
+                                    child: const Text("Cerrar sesión"),
+                                  ),
+                                ],
+                              )
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              child: const Padding(
+                padding: EdgeInsets.only(bottom: 14, top: 8),
+                child: Column(
+                  children: [
+                    Icon(Icons.logout, color: Colors.white70),
+                    SizedBox(height: 4),
+                    Text(
+                      "Salir",
+                      style: TextStyle(color: Colors.white60, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
