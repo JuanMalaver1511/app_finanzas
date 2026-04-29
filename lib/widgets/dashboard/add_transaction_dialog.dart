@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/transaction_model.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
@@ -376,11 +379,37 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
         ),
       );
 
+      if (widget.initial == null) {
+        await _playSaveSound();
+      }
+
       if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _playSaveSound() async {
+    try {
+      final player = AudioPlayer();
+      var disposed = false;
+      Future<void> disposePlayer() async {
+        if (disposed) return;
+        disposed = true;
+        await player.dispose();
+      }
+
+      unawaited(player.onPlayerComplete.first.then((_) => disposePlayer()));
+      unawaited(Future.delayed(const Duration(seconds: 2), disposePlayer));
+      await player.play(
+        AssetSource(
+          _isIncome ? 'sounds/income_yujuu.wav' : 'sounds/expense_down.wav',
+        ),
+      );
+    } catch (_) {
+      // El sonido es un refuerzo de UI; si la plataforma no lo soporta, no bloquea el guardado.
     }
   }
 

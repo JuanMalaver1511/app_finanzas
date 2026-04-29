@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 const kAmber = Color(0xFFFFB84E);
 const kBg = Color(0xFFF6F7FB);
@@ -26,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final user = FirebaseAuth.instance.currentUser!;
   final _firestore = FirebaseFirestore.instance;
   final _storage = FirebaseStorage.instance;
+  final _imagePicker = ImagePicker();
 
   final _nameCtrl = TextEditingController();
 
@@ -56,11 +57,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickAndUploadPhoto() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.image);
-      if (result == null) return;
+      final file = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
 
-      final bytes = result.files.first.bytes;
-      if (bytes == null) return;
+      if (file == null) return;
+
+      final bytes = await file.readAsBytes();
 
       setState(() => _uploadingPhoto = true);
 

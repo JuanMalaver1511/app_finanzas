@@ -27,6 +27,7 @@ dependencies:
   table_calendar: ^3.0.9
   emoji_picker_flutter: ^1.6.4
   file_picker: ^8.3.2
+  audioplayers: ^6.1.0
 
   shared_preferences: ^2.3.2
 
@@ -59,3 +60,4 @@ flutter:
   assets:
     - .env
     - assets/images/
+    - assets/sounds/
