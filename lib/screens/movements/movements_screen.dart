@@ -712,7 +712,7 @@ class _MovementsScreenState extends State<MovementsScreen>
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'Mis movimientos',
+              'Movimientos',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -783,14 +783,17 @@ class _MovementsScreenState extends State<MovementsScreen>
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              'Mis movimientos',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: kDark,
-                fontWeight: FontWeight.w800,
-                fontSize: isMobile ? 17 : 22,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Movimientos',
+                maxLines: 1,
+                style: TextStyle(
+                  color: kDark,
+                  fontWeight: FontWeight.w800,
+                  fontSize: isMobile ? 16 : 22,
+                ),
               ),
             ),
           ),
@@ -804,7 +807,7 @@ class _MovementsScreenState extends State<MovementsScreen>
             borderRadius: BorderRadius.circular(14),
             child: Container(
               height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 18),
               decoration: BoxDecoration(
                 color: kAmber,
                 borderRadius: BorderRadius.circular(14),
@@ -816,19 +819,21 @@ class _MovementsScreenState extends State<MovementsScreen>
                   ),
                 ],
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    "Nueva",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                  const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                  if (!isMobile) ...[
+                    const SizedBox(width: 8),
+                    const Text(
+                      "Nueva",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
