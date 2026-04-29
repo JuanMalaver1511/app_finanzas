@@ -375,15 +375,18 @@ class _DeudasScreenState extends State<DeudasScreen>
             ),
           ),
           const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'Mis Deudas',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 24,
-                color: kDark,
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Mis Deudas',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: isWide ? 24 : 18,
+                  color: kDark,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           GestureDetector(
