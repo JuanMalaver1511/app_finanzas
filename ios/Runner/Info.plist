@@ -24,6 +24,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Kybo necesita acceso a tus fotos solo cuando eliges una imagen para tu perfil o tus metas.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Kybo usa tu galería únicamente para seleccionar imágenes que quieras subir a tu perfil o tus metas.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

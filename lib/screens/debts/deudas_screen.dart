@@ -1838,21 +1838,23 @@ class _DeudasScreenState extends State<DeudasScreen>
     // Función para calcular cuota mensual con interés
     void calcularCuota() {
       final montoVal = _parseMoneyInput(monto.text);
+      final saldoVal = _parseMoneyInput(saldo.text);
+      final baseCalculo = saldo.text.trim().isEmpty ? montoVal : saldoVal;
       final interesVal = double.tryParse(interes.text) ?? 0;
       final numCuotasVal = int.tryParse(numCuotasCtrl.text) ?? 12;
 
-      if (montoVal <= 0 || numCuotasVal <= 0) {
+      if (baseCalculo <= 0 || numCuotasVal <= 0) {
         cuota.clear();
         return;
       }
 
       if (interesVal == 0) {
-        final cuotaSimple = montoVal / numCuotasVal;
+        final cuotaSimple = baseCalculo / numCuotasVal;
         cuota.text = _formatThousands(cuotaSimple.round());
       } else {
         final tasaMensual = (interesVal / 100) / 12;
         final numerador =
-            montoVal * tasaMensual * pow(1 + tasaMensual, numCuotasVal);
+            baseCalculo * tasaMensual * pow(1 + tasaMensual, numCuotasVal);
         final denominador = pow(1 + tasaMensual, numCuotasVal) - 1;
         final cuotaConInteres = numerador / denominador;
         cuota.text = _formatThousands(cuotaConInteres.round());
@@ -1924,12 +1926,17 @@ class _DeudasScreenState extends State<DeudasScreen>
                         isNumber: true,
                         onChanged: (value) {
                           _formatAmountInput(saldo, value);
+                          setM(calcularCuota);
                         },
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Saldo obligatorio';
                           }
                           final parsed = _parseMoneyInput(value);
+                          final montoParsed = _parseMoneyInput(monto.text);
+                          if (montoParsed > 0 && parsed > montoParsed) {
+                            return 'No puede superar el monto total';
+                          }
                           if (parsed < 0) {
                             return 'Ingresa un saldo válido';
                           }
